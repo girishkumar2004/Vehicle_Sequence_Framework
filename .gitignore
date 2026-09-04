@@ -1,48 +1,14 @@
-﻿# Unity generated folders
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Mm]emoryCaptures/
-[Bb]uild[Ll]ogs/
+# Only keep the Unity project folders
 
-# Unity generated backup/build output
-**/BackUpThisFolder_ButDontShipItWithYourGame/
-**/il2cppOutput/
+!Assets/
+!Assets/**
+!Packages/
+!Packages/**
+!ProjectSettings/
+!ProjectSettings/**
+!UserSettings/
+!UserSettings/**
 
-# Python virtual environments/cache
-**/.venv/
-**/venv/
-**/__pycache__/
-*.pyc
+# Ignore everything else
 
-# IDE
-.vs/
-.vscode/
-.idea/
-
-# Generated solution/project files
-*.csproj
-*.sln
-*.suo
-*.user
-*.userprefs
-
-# Android generated
-.gradle/
-ExportedObj/
-
-# MCP temporary files
-.utmp/
-
-# Claude local settings
-.claude/settings.local.json
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Local TTS model weights
-Assets/LocalTTS/Models/**/*.safetensors
+/*
