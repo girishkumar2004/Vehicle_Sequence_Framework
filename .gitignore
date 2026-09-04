@@ -1,48 +1,24 @@
-﻿# Unity generated folders
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Mm]emoryCaptures/
-[Bb]uild[Ll]ogs/
+# Ignore everything else
+/*
 
-# Unity generated backup/build output
-**/BackUpThisFolder_ButDontShipItWithYourGame/
-**/il2cppOutput/
+# Only keep the Unity project folders
+# (negations must come AFTER the broad exclusion above - gitignore uses
+# last-match-wins, so listing "/*" last would silently re-exclude everything)
+!Assets/
+!Assets/**
+!Packages/
+!Packages/**
+!ProjectSettings/
+!ProjectSettings/**
+!UserSettings/
+!UserSettings/**
+!.gitignore
 
-# Python virtual environments/cache
+# Re-exclude generated/huge/machine-specific content that can live inside
+# the allowed folders above (re-excluding a nested path under an already
+# included tree is fine in gitignore - only the reverse direction is not).
 **/.venv/
 **/venv/
 **/__pycache__/
 *.pyc
-
-# IDE
-.vs/
-.vscode/
-.idea/
-
-# Generated solution/project files
-*.csproj
-*.sln
-*.suo
-*.user
-*.userprefs
-
-# Android generated
-.gradle/
-ExportedObj/
-
-# MCP temporary files
-.utmp/
-
-# Claude local settings
-.claude/settings.local.json
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Local TTS model weights
 Assets/LocalTTS/Models/**/*.safetensors

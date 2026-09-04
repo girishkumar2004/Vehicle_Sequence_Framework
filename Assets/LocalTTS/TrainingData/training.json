@@ -1,122 +1,134 @@
 {
-  "welcome": {
-    "display": {
-      "en": "Welcome to Vedanta Aluminium Jharsuguda.\nNow we will start the Pneumatic Tyre Replacement module.",
-      "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है।\nअब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
-      "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ।\nଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
+  "entries": [
+    {
+      "key": "welcome",
+      "display": {
+        "en": "Welcome to Vedanta Aluminium Jharsuguda.\nNow we will start the Pneumatic Tyre Replacement module.",
+        "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है।\nअब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
+        "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ।\nଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
+      },
+      "speech": {
+        "en": "Welcome to Vedanta Aluminium Jharsuguda. Now we will start the Pneumatic Tyre Replacement module.",
+        "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है। अब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
+        "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ। ଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
+      }
     },
-    "speech": {
-      "en": "Welcome to Vedanta Aluminium Jharsuguda. Now we will start the Pneumatic Tyre Replacement module.",
-      "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है। अब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
-      "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ। ଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
-    }
-  },
-  "step0": {
-    "display": {
-      "en": "Welcome to Vedanta Aluminium Jharsuguda.\nNow we will start the Pneumatic Tyre Replacement module.",
-      "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है।\nअब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
-      "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ।\nଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
+    {
+      "key": "step0",
+      "display": {
+        "en": "Welcome to Vedanta Aluminium Jharsuguda.\nNow we will start the Pneumatic Tyre Replacement module.",
+        "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है।\nअब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
+        "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ।\nଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
+      },
+      "speech": {
+        "en": "Welcome to Vedanta Aluminium Jharsuguda. Now we will start the Pneumatic Tyre Replacement module.",
+        "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है। अब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
+        "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ। ଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
+      }
     },
-    "speech": {
-      "en": "Welcome to Vedanta Aluminium Jharsuguda. Now we will start the Pneumatic Tyre Replacement module.",
-      "hi": "वेदांता एल्युमिनियम झारसुगुड़ा में आपका स्वागत है। अब हम न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल शुरू करेंगे।",
-      "or": "ବେଦାନ୍ତ ଆଲୁମିନିୟମ୍ ଝାରସୁଗୁଡାକୁ ସ୍ୱାଗତ। ଏବେ ଆମେ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ଆରମ୍ଭ କରିବା।"
-    }
-  },
-  "step1": {
-    "display": {
-      "en": "To check if the tyre is punctured, rotate the tyre back and forth using the right controller.\nMove the right controller up and down to rotate the tyre.",
-      "hi": "टायर में पंचर है या नहीं यह जांचने के लिए, दाएं कंट्रोलर का उपयोग करके टायर को आगे और पीछे घुमाएं।\nटायर को घुमाने के लिए दाएं कंट्रोलर को ऊपर और नीचे ले जाएं।",
-      "or": "ଟାୟାର୍ରେ ପଙ୍କଚର୍ ଅଛି କି ନାହିଁ ଯାଞ୍ଚ କରିବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍ ବ୍ୟବହାର କରି ଟାୟାରକ୍ୟୁ ଆଗପଛ ଘୁଞ୍ଚାନ୍ତୁ।\nଟାୟାରକ୍ୟୁ ଘୁଞ୍ଚାଇବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍କୁ ଉପରକୁ ଏବଂ ତଳକୁ ଘୁଞ୍ଚାନ୍ତୁ।"
+    {
+      "key": "step1",
+      "display": {
+        "en": "To check if the tyre is punctured, rotate the tyre back and forth using the right controller.\nMove the right controller up and down to rotate the tyre.",
+        "hi": "टायर में पंचर है या नहीं यह जांचने के लिए, दाएं कंट्रोलर का उपयोग करके टायर को आगे और पीछे घुमाएं।\nटायर को घुमाने के लिए दाएं कंट्रोलर को ऊपर और नीचे ले जाएं।",
+        "or": "ଟାୟାର୍ରେ ପଙ୍କଚର୍ ଅଛି କି ନାହିଁ ଯାଞ୍ଚ କରିବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍ ବ୍ୟବହାର କରି ଟାୟାରକ୍ୟୁ ଆଗପଛ ଘୁଞ୍ଚାନ୍ତୁ।\nଟାୟାରକ୍ୟୁ ଘୁଞ୍ଚାଇବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍କୁ ଉପରକୁ ଏବଂ ତଳକୁ ଘୁଞ୍ଚାନ୍ତୁ।"
+      },
+      "speech": {
+        "en": "To check if the tyre is punctured, rotate the tyre back and forth using the right controller. Move the right controller up and down to rotate the tyre.",
+        "hi": "टायर में पंचर है या नहीं यह जांचने के लिए, दाएं कंट्रोलर का उपयोग करके टायर को आगे और पीछे घुमाएं। टायर को घुमाने के लिए दाएं कंट्रोलर को ऊपर और नीचे ले जाएं।",
+        "or": "ଟାୟାର୍ରେ ପଙ୍କଚର୍ ଅଛି କି ନାହିଁ ଯାଞ୍ଚ କରିବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍ ବ୍ୟବହାର କରି ଟାୟାରକ୍ୟୁ ଆଗପଛ ଘୁଞ୍ଚାନ୍ତୁ। ଟାୟାରକ୍ୟୁ ଘୁଞ୍ଚାଇବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍କୁ ଉପରକୁ ଏବଂ ତଳକୁ ଘୁଞ୍ଚାନ୍ତୁ।"
+      }
     },
-    "speech": {
-      "en": "To check if the tyre is punctured, rotate the tyre back and forth using the right controller. Move the right controller up and down to rotate the tyre.",
-      "hi": "टायर में पंचर है या नहीं यह जांचने के लिए, दाएं कंट्रोलर का उपयोग करके टायर को आगे और पीछे घुमाएं। टायर को घुमाने के लिए दाएं कंट्रोलर को ऊपर और नीचे ले जाएं।",
-      "or": "ଟାୟାର୍ରେ ପଙ୍କଚର୍ ଅଛି କି ନାହିଁ ଯାଞ୍ଚ କରିବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍ ବ୍ୟବହାର କରି ଟାୟାରକ୍ୟୁ ଆଗପଛ ଘୁଞ୍ଚାନ୍ତୁ। ଟାୟାରକ୍ୟୁ ଘୁଞ୍ଚାଇବା ପାଇଁ ଡାହାଣ କଣ୍ଟ୍ରୋଲର୍କୁ ଉପରକୁ ଏବଂ ତଳକୁ ଘୁଞ୍ଚାନ୍ତୁ।"
-    }
-  },
-  "step2": {
-    "display": {
-      "en": "Set the tyre pressure to 110 PSI.\nClick the highlighted green plus button to increase the pressure.",
-      "hi": "टायर का दबाव 110 पीएसआई पर सेट करें।\nदबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ।\nପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
+    {
+      "key": "step2",
+      "display": {
+        "en": "Set the tyre pressure to 110 PSI.\nClick the highlighted green plus button to increase the pressure.",
+        "hi": "टायर का दबाव 110 पीएसआई पर सेट करें।\nदबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ।\nପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
+      },
+      "speech": {
+        "en": "Set the tyre pressure to 110 PSI. Click the highlighted green plus button to increase the pressure.",
+        "hi": "टायर का दबाव 110 पीएसआई पर सेट करें। दबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ। ପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
+      }
     },
-    "speech": {
-      "en": "Set the tyre pressure to 110 PSI. Click the highlighted green plus button to increase the pressure.",
-      "hi": "टायर का दबाव 110 पीएसआई पर सेट करें। दबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ। ପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
-    }
-  },
-  "low_pressure": {
-    "display": {
-      "en": "Set the tyre pressure to 110 PSI.\nClick the highlighted green plus button to increase the pressure.",
-      "hi": "टायर का दबाव 110 पीएसआई पर सेट करें।\nदबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ।\nପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
+    {
+      "key": "low_pressure",
+      "display": {
+        "en": "Set the tyre pressure to 110 PSI.\nClick the highlighted green plus button to increase the pressure.",
+        "hi": "टायर का दबाव 110 पीएसआई पर सेट करें।\nदबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ।\nପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
+      },
+      "speech": {
+        "en": "Set the tyre pressure to 110 PSI. Click the highlighted green plus button to increase the pressure.",
+        "hi": "टायर का दबाव 110 पीएसआई पर सेट करें। दबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ। ପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
+      }
     },
-    "speech": {
-      "en": "Set the tyre pressure to 110 PSI. Click the highlighted green plus button to increase the pressure.",
-      "hi": "टायर का दबाव 110 पीएसआई पर सेट करें। दबाव बढ़ाने के लिए हरे रंग से हाइलाइट किए गए प्लस बटन को दबाएं।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ 110 PSI ରେ ସେଟ୍ କରନ୍ତୁ। ପ୍ରେସର୍ ବଢାଇବା ପାଇଁ ସବୁଜ ରଙ୍ଗରେ ହାଇଲାଇଟ୍ ହୋଇଥିବା ପ୍ଲସ୍ ବଟନ୍ ଦବାନ୍ତୁ।"
-    }
-  },
-  "high_pressure": {
-    "display": {
-      "en": "The tyre pressure is too high.\nReduce the pressure to 110 PSI using the minus button.",
-      "hi": "टायर का दबाव बहुत अधिक है।\nमाइनस बटन का उपयोग करके दबाव को 110 पीएसआई तक कम करें।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବହୁତ ଅଧିକ ଅଛି।\nମାଇନସ୍ ବଟନ୍ ବ୍ୟବହାର କରି ପ୍ରେସର୍କୁ 110 PSI କୁ କମାନ୍ତୁ।"
+    {
+      "key": "high_pressure",
+      "display": {
+        "en": "The tyre pressure is too high.\nReduce the pressure to 110 PSI using the minus button.",
+        "hi": "टायर का दबाव बहुत अधिक है।\nमाइनस बटन का उपयोग करके दबाव को 110 पीएसआई तक कम करें।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବହୁତ ଅଧିକ ଅଛି।\nମାଇନସ୍ ବଟନ୍ ବ୍ୟବହାର କରି ପ୍ରେସର୍କୁ 110 PSI କୁ କମାନ୍ତୁ।"
+      },
+      "speech": {
+        "en": "The tyre pressure is too high. Reduce the pressure to 110 PSI using the minus button.",
+        "hi": "टायर का दबाव बहुत अधिक है। माइनस बटन का उपयोग करके दबाव को 110 पीएसआई तक कम करें।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବହୁତ ଅଧିକ ଅଛି। ମାଇନସ୍ ବଟନ୍ ବ୍ୟବହାର କରି ପ୍ରେସର୍କୁ 110 PSI କୁ କମାନ୍ତୁ।"
+      }
     },
-    "speech": {
-      "en": "The tyre pressure is too high. Reduce the pressure to 110 PSI using the minus button.",
-      "hi": "टायर का दबाव बहुत अधिक है। माइनस बटन का उपयोग करके दबाव को 110 पीएसआई तक कम करें।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବହୁତ ଅଧିକ ଅଛି। ମାଇନସ୍ ବଟନ୍ ବ୍ୟବହାର କରି ପ୍ରେସର୍କୁ 110 PSI କୁ କମାନ୍ତୁ।"
-    }
-  },
-  "correct_pressure": {
-    "display": {
-      "en": "The tyre pressure is now correct at 110 PSI.\nPress SELECT to continue.",
-      "hi": "टायर का दबाव अब 110 पीएसआई पर सही है।\nजारी रखने के लिए SELECT दबाएं।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବର୍ତ୍ତମାନ 110 PSI ରେ ସଠିକ୍ ଅଛି।\nଆଗକୁ ବଢିବା ପାଇଁ SELECT ଦବାନ୍ତୁ।"
+    {
+      "key": "correct_pressure",
+      "display": {
+        "en": "The tyre pressure is now correct at 110 PSI.\nPress SELECT to continue.",
+        "hi": "टायर का दबाव अब 110 पीएसआई पर सही है।\nजारी रखने के लिए SELECT दबाएं।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବର୍ତ୍ତମାନ 110 PSI ରେ ସଠିକ୍ ଅଛି।\nଆଗକୁ ବଢିବା ପାଇଁ SELECT ଦବାନ୍ତୁ।"
+      },
+      "speech": {
+        "en": "The tyre pressure is now correct at 110 PSI. Press SELECT to continue.",
+        "hi": "टायर का दबाव अब 110 पीएसआई पर सही है। जारी रखने के लिए SELECT दबाएं।",
+        "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବର୍ତ୍ତମାନ 110 PSI ରେ ସଠିକ୍ ଅଛି। ଆଗକୁ ବଢିବା ପାଇଁ SELECT ଦବାନ୍ତୁ।"
+      }
     },
-    "speech": {
-      "en": "The tyre pressure is now correct at 110 PSI. Press SELECT to continue.",
-      "hi": "टायर का दबाव अब 110 पीएसआई पर सही है। जारी रखने के लिए SELECT दबाएं।",
-      "or": "ଟାୟାର୍ର ପ୍ରେସର୍ ବର୍ତ୍ତମାନ 110 PSI ରେ ସଠିକ୍ ଅଛି। ଆଗକୁ ବଢିବା ପାଇଁ SELECT ଦବାନ୍ତୁ।"
-    }
-  },
-  "pipe_grab": {
-    "display": {
-      "en": "Connect the air pipe to the wheel.\nGrab the Curves pipe on the right side and connect it to the wheel.",
-      "hi": "एयर पाइप को टायर से कनेक्ट करें।\nदाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
-      "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।\nଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
+    {
+      "key": "pipe_grab",
+      "display": {
+        "en": "Connect the air pipe to the wheel.\nGrab the Curves pipe on the right side and connect it to the wheel.",
+        "hi": "एयर पाइप को टायर से कनेक्ट करें।\nदाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
+        "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।\nଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
+      },
+      "speech": {
+        "en": "Connect the air pipe to the wheel. Grab the Curves pipe on the right side and connect it to the wheel.",
+        "hi": "एयर पाइप को टायर से कनेक्ट करें। दाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
+        "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ। ଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
+      }
     },
-    "speech": {
-      "en": "Connect the air pipe to the wheel. Grab the Curves pipe on the right side and connect it to the wheel.",
-      "hi": "एयर पाइप को टायर से कनेक्ट करें। दाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
-      "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ। ଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
-    }
-  },
-  "air_filling": {
-    "display": {
-      "en": "Connect the air pipe to the wheel.\nGrab the Curves pipe on the right side and connect it to the wheel.",
-      "hi": "एयर पाइप को टायर से कनेक्ट करें।\nदाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
-      "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।\nଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
+    {
+      "key": "air_filling",
+      "display": {
+        "en": "Connect the air pipe to the wheel.\nGrab the Curves pipe on the right side and connect it to the wheel.",
+        "hi": "एयर पाइप को टायर से कनेक्ट करें।\nदाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
+        "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।\nଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
+      },
+      "speech": {
+        "en": "Connect the air pipe to the wheel. Grab the Curves pipe on the right side and connect it to the wheel.",
+        "hi": "एयर पाइप को टायर से कनेक्ट करें। दाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
+        "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ। ଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
+      }
     },
-    "speech": {
-      "en": "Connect the air pipe to the wheel. Grab the Curves pipe on the right side and connect it to the wheel.",
-      "hi": "एयर पाइप को टायर से कनेक्ट करें। दाईं ओर स्थित कर्व्स पाइप को पकड़कर उसे टायर से कनेक्ट करें।",
-      "or": "ଏୟାର୍ ପାଇପ୍କୁ ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ। ଡାହାଣ ପାର୍ଶ୍ୱରେ ଥିବା କର୍ଭ୍ସ ପାଇପ୍କୁ ଧରି ଟାୟାର୍ ସହିତ ସଂଯୋଗ କରନ୍ତୁ।"
+    {
+      "key": "complete",
+      "display": {
+        "en": "Thank you.\nYou have successfully completed the Pneumatic Tyre Replacement module.",
+        "hi": "धन्यवाद।\nआपने न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल सफलतापूर्वक पूरा कर लिया है।",
+        "or": "ଧନ୍ୟବାଦ।\nଆପଣ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ସଫଳତାର ସହିତ ସମାପ୍ତ କରିଛନ୍ତି।"
+      },
+      "speech": {
+        "en": "Thank you. You have successfully completed the Pneumatic Tyre Replacement module.",
+        "hi": "धन्यवाद। आपने न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल सफलतापूर्वक पूरा कर लिया है।",
+        "or": "ଧନ୍ୟବାଦ। ଆପଣ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ସଫଳତାର ସହିତ ସମାପ୍ତ କରିଛନ୍ତି।"
+      }
     }
-  },
-  "complete": {
-    "display": {
-      "en": "Thank you.\nYou have successfully completed the Pneumatic Tyre Replacement module.",
-      "hi": "धन्यवाद।\nआपने न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल सफलतापूर्वक पूरा कर लिया है।",
-      "or": "ଧନ୍ୟବାଦ।\nଆପଣ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ସଫଳତାର ସହିତ ସମାପ୍ତ କରିଛନ୍ତି।"
-    },
-    "speech": {
-      "en": "Thank you. You have successfully completed the Pneumatic Tyre Replacement module.",
-      "hi": "धन्यवाद। आपने न्यूमैटिक टायर रिप्लेसमेंट मॉड्यूल सफलतापूर्वक पूरा कर लिया है।",
-      "or": "ଧନ୍ୟବାଦ। ଆପଣ ପ୍ନ୍ୟୁମାଟିକ୍ ଟାୟାର୍ ରିପ୍ଲେସମେଣ୍ଟ୍ ମଡ୍ୟୁଲ୍ ସଫଳତାର ସହିତ ସମାପ୍ତ କରିଛନ୍ତି।"
-    }
-  }
+  ]
 }
