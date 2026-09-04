@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Text;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -40,10 +41,21 @@ namespace TruckTyreReplacement.Core
         public string odiaSpeech;
     }
 
+    [System.Serializable]
+    public class LanguageFontEntry
+    {
+        public LocalTTSLanguage language;
+        public TMP_FontAsset font;
+    }
+
     /// <summary>
     /// Generic Manager for VR Training Modules.
-    /// Handles VR Configuration, Multilingual Localization Database,
-    /// Language Selection, and Preloaded Offline MMS-TTS Audio.
+    /// Handles VR Configuration, Multilingual Localization (driven by an
+    /// external training.json), Language Selection, generic Inspector-driven
+    /// fonts, and externally-cached offline TTS audio. Contains no
+    /// module-specific (tyre/vehicle/etc.) assumptions - reusable across
+    /// future training modules by changing external data and Inspector
+    /// configuration only.
     /// </summary>
     [AddComponentMenu("Vedanta/Manager")]
     public class Manager : MonoBehaviour
@@ -76,25 +88,44 @@ namespace TruckTyreReplacement.Core
         [SerializeField] private bool interruptCurrentSpeech = true;
 
         [Header("FONTS")]
-        [SerializeField] private TMP_FontAsset englishFont;
-        [SerializeField] private TMP_FontAsset devanagariFont;
-        [SerializeField] private TMP_FontAsset odiaFont;
+        [Tooltip("Generic language -> font mapping. Order does not matter; the language value determines the font. Add/reorder/replace entries freely.")]
+        [SerializeField] private List<LanguageFontEntry> languageFonts = new List<LanguageFontEntry>();
+        [Tooltip("Used when a language has no assigned font. May be left empty.")]
+        [SerializeField] private TMP_FontAsset fallbackFont;
 
-        [Header("TRANSLATION DATABASE")]
-        [Tooltip("The multilingual translation entries editable directly in Inspector.")]
+        [Header("LOCALIZED UI TARGETS")]
+        [Tooltip("TMP_Text components whose font is updated on language change. Populated automatically at startup from the current scene; register/unregister dynamically-created UI via RegisterLocalizedText/UnregisterLocalizedText.")]
+        [SerializeField] private List<TMP_Text> localizedTextTargets = new List<TMP_Text>();
+
+        [Header("TRAINING DATA (runtime representation of external training.json)")]
+        [Tooltip("Populated at runtime from Application.persistentDataPath/TrainingData/training.json. Not authoritative - editing here does not persist.")]
         [SerializeField] private List<TranslationEntry> translationDatabase = new List<TranslationEntry>();
+
+        [Header("JSON MONITORING")]
+        [SerializeField] private bool monitorExternalTrainingJson = true;
+        [SerializeField] private float jsonCheckInterval = 2f;
 
         [Header("DEBUG")]
         [SerializeField] private bool debugMode = false;
 
-        // ── Memory Audio Cache ───────────────────────────────
-        private readonly Dictionary<string, AudioClip> audioClipMemoryCache = new Dictionary<string, AudioClip>();
-        private readonly Queue<string> speechQueue = new Queue<string>();
+        // ── TTS Cache Service ────────────────────────────────
+        private readonly LocalTTSCacheService ttsCache = new LocalTTSCacheService();
+
+        private struct SpeechRequest
+        {
+            public string key;
+            public string text;
+        }
+
+        private readonly Queue<SpeechRequest> speechQueue = new Queue<SpeechRequest>();
         private Coroutine speechCoroutine;
         private bool isSpeaking = false;
         private string lastSpokenText = "";
         private string lastSpokenKey = "";
         public string LastSpokenKey => lastSpokenKey;
+
+        // ── JSON state ───────────────────────────────────────
+        private string lastTrainingJsonContentHash = "";
 
         // ── UI State ─────────────────────────────────────────
         private GameObject languageSelectionPanel;
@@ -104,6 +135,8 @@ namespace TruckTyreReplacement.Core
         public bool IsSpeaking => isSpeaking;
 
         public event Action<LocalTTSLanguage> OnLanguageChanged;
+
+        public string TrainingJsonPath => Path.Combine(Application.persistentDataPath, "TrainingData", "training.json");
 
         public static string GetLanguageCode(LocalTTSLanguage lang)
         {
@@ -146,13 +179,13 @@ namespace TruckTyreReplacement.Core
             voiceAudioSource.playOnAwake = false;
             voiceAudioSource.loop = false;
 
-            // Load fonts if not assigned
-            LoadFontAssets();
+            EnsureLanguageFonts();
 
-            // Populate database from JSON if empty
-            if (translationDatabase == null || translationDatabase.Count == 0)
+            // Populate translation database from external JSON if empty
+            if (translationDatabase == null) translationDatabase = new List<TranslationEntry>();
+            if (translationDatabase.Count == 0)
             {
-                ImportTrainingJson();
+                LoadTrainingDataFromDisk(logIfMissing: true);
             }
 
             PrepopulateFonts();
@@ -167,7 +200,18 @@ namespace TruckTyreReplacement.Core
 
         private void Start()
         {
+            // Deferred from Awake/InitializeManager: at Awake time other scene
+            // objects are not yet reliably reported as scene-loaded, which made
+            // this silently discover 0 targets. Start() runs after every
+            // Awake() in the scene, so the scan is reliable here.
+            AutoDiscoverLocalizedTargets();
+
             StartCoroutine(StartupLanguageRoutine());
+
+            if (monitorExternalTrainingJson)
+            {
+                StartCoroutine(JsonMonitorRoutine());
+            }
         }
 
         private IEnumerator StartupLanguageRoutine()
@@ -196,6 +240,15 @@ namespace TruckTyreReplacement.Core
                 SetLanguage((LocalTTSLanguage)savedLangIndex);
             }
             yield return null;
+        }
+
+        private IEnumerator JsonMonitorRoutine()
+        {
+            while (monitorExternalTrainingJson)
+            {
+                yield return new WaitForSeconds(Mathf.Max(0.5f, jsonCheckInterval));
+                ReloadTrainingDataIfChanged();
+            }
         }
 
         // ─────────────────────────────────────────────────────
@@ -241,37 +294,76 @@ namespace TruckTyreReplacement.Core
             }
         }
 
-        private void LoadFontAssets()
+        private void EnsureLanguageFonts()
         {
-            if (englishFont == null)
-            {
-                englishFont = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+            if (languageFonts != null && languageFonts.Count > 0) return;
+            if (languageFonts == null) languageFonts = new List<LanguageFontEntry>();
+
+            TMP_FontAsset english = Resources.Load<TMP_FontAsset>("Fonts & Materials/LiberationSans SDF");
+            TMP_FontAsset hindi = null;
+            TMP_FontAsset odia = null;
+
 #if UNITY_EDITOR
-                if (englishFont == null)
+            if (english == null)
+            {
+                english = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+            }
+            hindi = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/LocalTTS/Fonts/NotoSansDevanagari SDF.asset");
+            odia = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/LocalTTS/Fonts/NotoSansOdia SDF.asset");
+#endif
+
+            languageFonts.Add(new LanguageFontEntry { language = LocalTTSLanguage.English, font = english });
+            languageFonts.Add(new LanguageFontEntry { language = LocalTTSLanguage.Hindi, font = hindi });
+            languageFonts.Add(new LanguageFontEntry { language = LocalTTSLanguage.Odia, font = odia });
+
+            if (debugMode) Debug.Log("[FONTS] languageFonts list was empty - auto-populated default entries.");
+        }
+
+        /// <summary>
+        /// Resolves the font for a language by searching languageFonts by
+        /// VALUE, never by list index/order. Never throws: falls back to
+        /// fallbackFont (which may itself be null) and logs a warning
+        /// instead of crashing.
+        /// </summary>
+        public TMP_FontAsset GetFontForLanguage(LocalTTSLanguage language)
+        {
+            EnsureLanguageFonts();
+
+            TMP_FontAsset resolved = null;
+            int matchCount = 0;
+
+            if (languageFonts != null)
+            {
+                foreach (var entry in languageFonts)
                 {
-                    englishFont = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset");
+                    if (entry == null || entry.language != language) continue;
+                    matchCount++;
+                    if (resolved == null && entry.font != null)
+                    {
+                        resolved = entry.font;
+                    }
                 }
-#endif
             }
-            if (devanagariFont == null)
+
+            if (matchCount > 1)
             {
-#if UNITY_EDITOR
-                devanagariFont = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/LocalTTS/Fonts/NotoSansDevanagari SDF.asset");
-#endif
+                Debug.LogWarning($"[FONTS] Duplicate languageFonts entries found for language '{language}'. Using the first assigned font found.");
             }
-            if (odiaFont == null)
+
+            if (resolved == null)
             {
-#if UNITY_EDITOR
-                odiaFont = UnityEditor.AssetDatabase.LoadAssetAtPath<TMP_FontAsset>("Assets/LocalTTS/Fonts/NotoSansOdia SDF.asset");
-#endif
+                Debug.LogWarning($"[FONTS] No font assigned for language '{language}'.{(fallbackFont != null ? " Using fallbackFont." : " No fallbackFont configured either.")}");
+                resolved = fallbackFont;
             }
+
+            return resolved;
         }
 
         private void PrepopulateFonts()
         {
             if (translationDatabase == null) return;
 
-            var sb = new System.Text.StringBuilder(" SELECT LANGUAGE English हिन्दी ଓଡ଼ିଆ ");
+            var sb = new StringBuilder(" SELECT LANGUAGE English हिन्दी ଓଡ଼ିଆ ");
             foreach (var entry in translationDatabase)
             {
                 sb.Append(entry.hindiDisplay).Append(" ").Append(entry.hindiSpeech).Append(" ");
@@ -280,44 +372,83 @@ namespace TruckTyreReplacement.Core
 
             string fullText = sb.ToString();
 
-            if (devanagariFont != null)
+            var hindiFontAsset = GetFontForLanguage(LocalTTSLanguage.Hindi);
+            var odiaFontAsset = GetFontForLanguage(LocalTTSLanguage.Odia);
+
+            if (hindiFontAsset != null)
             {
-                devanagariFont.TryAddCharacters(fullText, true);
+                hindiFontAsset.TryAddCharacters(fullText, true);
             }
-            if (odiaFont != null)
+            if (odiaFontAsset != null)
             {
-                odiaFont.TryAddCharacters(fullText, true);
+                odiaFontAsset.TryAddCharacters(fullText, true);
             }
         }
 
+        /// <summary>
+        /// Applies the font for the given language to every registered
+        /// localized text target. Does not scan the whole scene - see
+        /// AutoDiscoverLocalizedTargets/RegisterLocalizedText.
+        /// </summary>
         public void ApplyFontForLanguage(LocalTTSLanguage lang)
         {
-            LoadFontAssets();
+            TMP_FontAsset targetFont = GetFontForLanguage(lang);
 
-            TMP_FontAsset targetFont = englishFont;
-            if (lang == LocalTTSLanguage.Hindi) targetFont = devanagariFont;
-            else if (lang == LocalTTSLanguage.Odia) targetFont = odiaFont;
+            if (targetFont == null)
+            {
+                Debug.LogWarning($"[FONTS] ApplyFontForLanguage: no font resolved for {lang}; registered targets keep their current font.");
+                return;
+            }
 
-            if (targetFont == null) targetFont = englishFont;
-            if (targetFont == null) return;
+            int applied = 0;
+            for (int i = localizedTextTargets.Count - 1; i >= 0; i--)
+            {
+                var txt = localizedTextTargets[i];
+                if (txt == null)
+                {
+                    localizedTextTargets.RemoveAt(i);
+                    continue;
+                }
+                txt.font = targetFont;
+                applied++;
+            }
 
+            Debug.Log($"[FONTS]\nLanguage = {lang}\nFont = {targetFont.name}\nTargets updated = {applied}");
+        }
+
+        private void AutoDiscoverLocalizedTargets()
+        {
             var allTexts = Resources.FindObjectsOfTypeAll<TMP_Text>();
             foreach (var txt in allTexts)
             {
-                if (txt != null && txt.gameObject.scene.isLoaded)
+                if (txt == null || !txt.gameObject.scene.IsValid() || !txt.gameObject.scene.isLoaded) continue;
+
+                if (txt.transform.parent != null &&
+                    (txt.transform.parent.name == "EnglishButton" ||
+                     txt.transform.parent.name == "HindiButton" ||
+                     txt.transform.parent.name == "OdiaButton" ||
+                     txt.transform.parent.name == "LanguageSelectionPanel"))
                 {
-                    // Don't overwrite the language selection buttons' native fonts if panel is present
-                    if (txt.transform.parent != null && 
-                        (txt.transform.parent.name == "EnglishButton" || 
-                         txt.transform.parent.name == "HindiButton" || 
-                         txt.transform.parent.name == "OdiaButton" || 
-                         txt.transform.parent.name == "LanguageSelectionPanel"))
-                    {
-                        continue;
-                    }
-                    txt.font = targetFont;
+                    continue;
                 }
+
+                RegisterLocalizedText(txt);
             }
+
+            if (debugMode) Debug.Log($"[FONTS] Auto-discovered {localizedTextTargets.Count} localized text target(s) at startup.");
+        }
+
+        public void RegisterLocalizedText(TMP_Text text)
+        {
+            if (text == null) return;
+            if (localizedTextTargets.Contains(text)) return;
+            localizedTextTargets.Add(text);
+        }
+
+        public void UnregisterLocalizedText(TMP_Text text)
+        {
+            if (text == null) return;
+            localizedTextTargets.Remove(text);
         }
 
         // ─────────────────────────────────────────────────────
@@ -370,68 +501,221 @@ namespace TruckTyreReplacement.Core
             return speech;
         }
 
-        // ─────────────────────────────────────────────────────
-        // OFFLINE PRELOADED MMS-TTS AUDIO
-        // ─────────────────────────────────────────────────────
-
-        private string ComputeTextHash(string text)
+        private static string GetSpeechTextForLanguage(TranslationEntry entry, LocalTTSLanguage lang)
         {
-            using (var md5 = MD5.Create())
+            switch (lang)
             {
-                byte[] inputBytes = System.Text.Encoding.UTF8.GetBytes(text);
-                byte[] hashBytes = md5.ComputeHash(inputBytes);
-                return BitConverter.ToString(hashBytes, 0, 4).Replace("-", "");
+                case LocalTTSLanguage.Hindi: return entry.hindiSpeech;
+                case LocalTTSLanguage.Odia: return entry.odiaSpeech;
+                default: return entry.englishSpeech;
             }
         }
 
-        private string GetCacheKey(LocalTTSLanguage lang, string text)
+        // ─────────────────────────────────────────────────────
+        // EXTERNAL TRAINING JSON (persistentDataPath)
+        // ─────────────────────────────────────────────────────
+
+        [ContextMenu("Import Training JSON")]
+        public void ImportTrainingJson()
         {
-            string clean = text.Replace("\n", " ").Replace("\r", " ").Trim();
-            return lang.ToString() + "_" + ComputeTextHash(clean);
+            LoadTrainingDataFromDisk(logIfMissing: true);
         }
+
+        private bool LoadTrainingDataFromDisk(bool logIfMissing)
+        {
+            string path = TrainingJsonPath;
+
+            if (!File.Exists(path))
+            {
+                try
+                {
+                    string dir = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    {
+                        Directory.CreateDirectory(dir);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.LogError($"[JSON] Failed to create TrainingData directory.\nPath = {path}\nException = {ex.Message}");
+                }
+
+                if (logIfMissing)
+                {
+                    Debug.LogWarning($"[JSON] training.json not found.\nExpected path = {path}\nUse 'Vedanta Training Data > Deploy Training JSON' in the Editor to deploy it.");
+                }
+                return false;
+            }
+
+            string jsonText;
+            try
+            {
+                jsonText = File.ReadAllText(path, Encoding.UTF8);
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[JSON] Failed to read training.json.\nPath = {path}\nException = {ex.Message}");
+                return false;
+            }
+
+            if (string.IsNullOrEmpty(jsonText))
+            {
+                Debug.LogWarning($"[JSON] training.json is empty.\nPath = {path}");
+                return false;
+            }
+
+            try
+            {
+                var root = JsonUtility.FromJson<JsonRootV2>(jsonText);
+                if (root == null || root.entries == null)
+                {
+                    Debug.LogError($"[JSON] training.json parsed but contained no entries.\nPath = {path}");
+                    return false;
+                }
+
+                translationDatabase.Clear();
+                foreach (var raw in root.entries)
+                {
+                    if (raw == null || string.IsNullOrEmpty(raw.key)) continue;
+                    translationDatabase.Add(new TranslationEntry
+                    {
+                        key = raw.key,
+                        englishDisplay = raw.display?.en ?? "",
+                        englishSpeech = raw.speech?.en ?? "",
+                        hindiDisplay = raw.display?.hi ?? "",
+                        hindiSpeech = raw.speech?.hi ?? "",
+                        odiaDisplay = raw.display?.or ?? "",
+                        odiaSpeech = raw.speech?.or ?? ""
+                    });
+                }
+
+                lastTrainingJsonContentHash = ComputeContentHash(jsonText);
+
+                Debug.Log($"[JSON]\nLoaded: {path}\n[LOCALIZATION]\nLoaded {translationDatabase.Count} translation entries.");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Debug.LogError($"[JSON] Failed to parse training.json.\nPath = {path}\nException = {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Forces a reload from disk, rebuilds the translation database and
+        /// re-applies fonts/audio preload for the current language. Does not
+        /// restart SequenceHandler and does not change the current language.
+        /// </summary>
+        public void ReloadTrainingData()
+        {
+            var previousHashes = SnapshotSpeechHashes();
+
+            bool loaded = LoadTrainingDataFromDisk(logIfMissing: true);
+            if (!loaded) return;
+
+            var newHashes = SnapshotSpeechHashes();
+            foreach (var kvp in newHashes)
+            {
+                if (previousHashes.TryGetValue(kvp.Key, out string oldHash) && oldHash != kvp.Value)
+                {
+                    Debug.Log($"[JSON] Speech content changed for '{kvp.Key}'. Previously cached audio for the old hash is now OUTDATED.");
+                }
+            }
+
+            PrepopulateFonts();
+            ApplyFontForLanguage(currentLanguage);
+            PreloadLanguageAudio(currentLanguage);
+        }
+
+        /// <summary>
+        /// Cheap periodic check: compares a content hash of the external
+        /// training.json to the last-loaded hash and only reparses when it
+        /// actually changed. Intended to be called on an interval, not per-frame.
+        /// </summary>
+        public void ReloadTrainingDataIfChanged()
+        {
+            string path = TrainingJsonPath;
+            if (!File.Exists(path)) return;
+
+            string jsonText;
+            try
+            {
+                jsonText = File.ReadAllText(path, Encoding.UTF8);
+            }
+            catch
+            {
+                return;
+            }
+
+            string currentHash = ComputeContentHash(jsonText);
+            if (currentHash == lastTrainingJsonContentHash) return;
+
+            if (debugMode) Debug.Log("[JSON] External training.json change detected. Reloading.");
+            ReloadTrainingData();
+        }
+
+        private Dictionary<string, string> SnapshotSpeechHashes()
+        {
+            var map = new Dictionary<string, string>();
+            if (translationDatabase == null) return map;
+            foreach (var entry in translationDatabase)
+            {
+                foreach (LocalTTSLanguage lang in Enum.GetValues(typeof(LocalTTSLanguage)))
+                {
+                    string langName = lang.ToString();
+                    string speech = GetSpeechTextForLanguage(entry, lang);
+                    map[entry.key + "|" + langName] = LocalTTSCacheService.ComputeSpeechHash(langName, LocalTTSCacheService.NormalizeSpeechText(speech));
+                }
+            }
+            return map;
+        }
+
+        private static string ComputeContentHash(string content)
+        {
+            using (var sha = SHA256.Create())
+            {
+                byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(content));
+                var sb = new StringBuilder(bytes.Length * 2);
+                foreach (byte b in bytes) sb.Append(b.ToString("X2"));
+                return sb.ToString();
+            }
+        }
+
+        [Serializable] private class JsonLangText { public string en; public string hi; public string or; }
+        [Serializable] private class JsonEntryRaw { public string key; public JsonLangText display; public JsonLangText speech; }
+        [Serializable] private class JsonRootV2 { public List<JsonEntryRaw> entries; }
+
+        // ─────────────────────────────────────────────────────
+        // OFFLINE TTS AUDIO (externally cached, SHA-256 keyed)
+        // ─────────────────────────────────────────────────────
 
         private void PreloadLanguageAudio(LocalTTSLanguage lang)
         {
             if (translationDatabase == null) return;
+            string langName = lang.ToString();
 
             foreach (var entry in translationDatabase)
             {
-                string speechText = "";
-                switch (lang)
-                {
-                    case LocalTTSLanguage.Hindi: speechText = entry.hindiSpeech; break;
-                    case LocalTTSLanguage.Odia: speechText = entry.odiaSpeech; break;
-                    default: speechText = entry.englishSpeech; break;
-                }
-
+                string speechText = GetSpeechTextForLanguage(entry, lang);
                 if (string.IsNullOrEmpty(speechText)) continue;
 
-                string cacheKey = GetCacheKey(lang, speechText);
-                if (audioClipMemoryCache.ContainsKey(cacheKey)) continue;
+                string clean = LocalTTSCacheService.NormalizeSpeechText(speechText);
+                string hash = LocalTTSCacheService.ComputeSpeechHash(langName, clean);
 
-                // Load from Resources Audio Cache
-                string resourcePath = "Audio/" + lang.ToString() + "/" + cacheKey;
-                AudioClip clip = Resources.Load<AudioClip>(resourcePath);
+                var status = ttsCache.GetStatus(entry.key, langName, hash, out string expectedPath);
 
-                if (clip == null)
+                if (debugMode)
                 {
-                    // Fallback to disk cache if available
-                    string diskPath = Path.Combine(Application.persistentDataPath, "LocalTTSCache", lang.ToString(), cacheKey + ".wav");
-                    if (File.Exists(diskPath))
-                    {
-                        try
-                        {
-                            byte[] wavBytes = File.ReadAllBytes(diskPath);
-                            clip = LoadWavAsAudioClip(wavBytes, cacheKey);
-                        }
-                        catch { }
-                    }
+                    Debug.Log($"[TTS CACHE]\nKey = {entry.key}\nLanguage = {langName}\nHash = {hash}\nFile = {Path.GetFileName(expectedPath)}\nStatus = {status.ToString().ToUpperInvariant()}");
                 }
 
-                if (clip != null)
+                if (status == TTSCacheStatus.Valid && !ttsCache.TryGetMemoryClip(langName, hash, out _))
                 {
-                    audioClipMemoryCache[cacheKey] = clip;
-                    if (debugMode) Debug.Log($"[Manager][AudioCache] Preloaded {lang}: {cacheKey}");
+                    var clip = ttsCache.LoadClipFromDisk(langName, hash, $"{langName}_{hash}");
+                    if (clip != null)
+                    {
+                        ttsCache.SetMemoryClip(langName, hash, clip);
+                    }
                 }
             }
         }
@@ -446,7 +730,8 @@ namespace TruckTyreReplacement.Core
                 PreloadLanguageAudio(currentLanguage);
             }
 
-            // Resolve key if text is a database key
+            // Resolve key if text is a database key; otherwise treat input as direct speech text.
+            string resolvedKey = textOrKey;
             string textToSpeak = textOrKey;
             var entry = translationDatabase.Find(e => string.Equals(e.key, textOrKey, StringComparison.OrdinalIgnoreCase));
             if (entry != null)
@@ -454,7 +739,7 @@ namespace TruckTyreReplacement.Core
                 textToSpeak = GetSpeechText(textOrKey);
             }
 
-            string cleanText = textToSpeak.Replace("\n", " ").Replace("\r", " ").Trim();
+            string cleanText = LocalTTSCacheService.NormalizeSpeechText(textToSpeak);
             if (string.IsNullOrEmpty(cleanText)) return;
 
             if (!string.IsNullOrEmpty(lastSpokenKey) && string.Equals(textOrKey, lastSpokenKey, StringComparison.OrdinalIgnoreCase) && cleanText == lastSpokenText && voiceAudioSource != null && voiceAudioSource.isPlaying)
@@ -470,7 +755,7 @@ namespace TruckTyreReplacement.Core
                 StopSpeech();
             }
 
-            speechQueue.Enqueue(cleanText);
+            speechQueue.Enqueue(new SpeechRequest { key = resolvedKey, text = cleanText });
             isSpeaking = true;
 
             if (speechCoroutine == null)
@@ -520,29 +805,16 @@ namespace TruckTyreReplacement.Core
         private IEnumerator ProcessSpeechQueue()
         {
             isSpeaking = true;
+            string langName = currentLanguage.ToString();
 
             while (speechQueue.Count > 0)
             {
-                string text = speechQueue.Dequeue();
-                string cacheKey = GetCacheKey(currentLanguage, text);
+                var request = speechQueue.Dequeue();
+                string hash = LocalTTSCacheService.ComputeSpeechHash(langName, request.text);
 
-                AudioClip clipToPlay = null;
+                AudioClip clipToPlay = ResolveClipForPlayback(langName, hash, out TTSCacheStatus status, out string expectedPath);
 
-                // 1. Check memory cache
-                if (audioClipMemoryCache.TryGetValue(cacheKey, out AudioClip memClip) && memClip != null)
-                {
-                    clipToPlay = memClip;
-                }
-                else
-                {
-                    // 2. Resources fallback
-                    string resourcePath = "Audio/" + currentLanguage.ToString() + "/" + cacheKey;
-                    clipToPlay = Resources.Load<AudioClip>(resourcePath);
-                    if (clipToPlay != null)
-                    {
-                        audioClipMemoryCache[cacheKey] = clipToPlay;
-                    }
-                }
+                Debug.Log($"[TTS CACHE]\nKey = {request.key}\nLanguage = {langName}\nHash = {hash}\nFile = {Path.GetFileName(expectedPath)}\nStatus = {status.ToString().ToUpperInvariant()}");
 
                 if (clipToPlay != null && voiceAudioSource != null)
                 {
@@ -550,13 +822,27 @@ namespace TruckTyreReplacement.Core
                     voiceAudioSource.volume = voiceVolume;
                     voiceAudioSource.Play();
 
-                    if (debugMode) Debug.Log($"[Manager][Audio] Playing {currentLanguage} clip: {clipToPlay.name} ({clipToPlay.length:F2}s)");
+                    Debug.Log($"[TTS PLAYBACK]\nPlaying external cached WAV\nKey = {request.key}\nLanguage = {langName}\nPath = {expectedPath}");
 
-                    yield return new WaitForSeconds(clipToPlay.length + 0.1f);
+                    // Wait for playback to actually begin, then for it to finish -
+                    // never assume completion purely from clip.length.
+                    float safetyTimeout = clipToPlay.length * 2f + 1f;
+                    float waited = 0f;
+                    while (!voiceAudioSource.isPlaying && waited < 1f)
+                    {
+                        waited += Time.deltaTime;
+                        yield return null;
+                    }
+                    waited = 0f;
+                    while (voiceAudioSource.isPlaying && waited < safetyTimeout)
+                    {
+                        waited += Time.deltaTime;
+                        yield return null;
+                    }
                 }
                 else
                 {
-                    if (debugMode) Debug.LogWarning($"[Manager][Audio] No pre-generated audio found for key: {cacheKey}");
+                    Debug.LogWarning($"[TTS MISSING]\nKey = {request.key}\nLanguage = {langName}\nSpeech = {request.text}\nExpectedPath = {expectedPath}");
                     yield return new WaitForSeconds(1.0f);
                 }
             }
@@ -565,47 +851,50 @@ namespace TruckTyreReplacement.Core
             speechCoroutine = null;
         }
 
-        private AudioClip LoadWavAsAudioClip(byte[] wavBytes, string name)
+        private AudioClip ResolveClipForPlayback(string langName, string hash, out TTSCacheStatus status, out string expectedPath)
         {
-            if (wavBytes == null || wavBytes.Length < 44) return null;
-            try
+            // Status is looked up against the manifest by key elsewhere (preload/report);
+            // here playback only needs hash-based identity, so query by hash directly.
+            expectedPath = ttsCache.GetCacheFilePath(langName, hash);
+            status = File.Exists(expectedPath) ? TTSCacheStatus.Valid : TTSCacheStatus.Missing;
+
+            if (ttsCache.TryGetMemoryClip(langName, hash, out AudioClip memClip) && memClip != null)
             {
-                int channels = BitConverter.ToInt16(wavBytes, 22);
-                int sampleRate = BitConverter.ToInt32(wavBytes, 24);
-                int bitsPerSample = BitConverter.ToInt16(wavBytes, 34);
-                int bytesPerSample = bitsPerSample / 8;
-
-                int pos = 12;
-                while (pos < wavBytes.Length - 8)
-                {
-                    if (wavBytes[pos] == 'd' && wavBytes[pos + 1] == 'a' && wavBytes[pos + 2] == 't' && wavBytes[pos + 3] == 'a')
-                    { pos += 4; break; }
-                    pos++;
-                }
-
-                int dataSize = BitConverter.ToInt32(wavBytes, pos);
-                pos += 4;
-                int totalSamples = dataSize / bytesPerSample;
-                int samplesPerChannel = totalSamples / channels;
-
-                float[] samples = new float[totalSamples];
-                for (int i = 0; i < totalSamples; i++)
-                {
-                    if (bytesPerSample == 2)
-                        samples[i] = BitConverter.ToInt16(wavBytes, pos + i * 2) / 32768f;
-                    else if (bytesPerSample == 1)
-                        samples[i] = (wavBytes[pos + i] - 128) / 128f;
-                }
-
-                AudioClip clip = AudioClip.Create(name, samplesPerChannel, channels, sampleRate, false);
-                clip.SetData(samples, 0);
-                return clip;
+                status = TTSCacheStatus.Valid;
+                return memClip;
             }
-            catch
+
+            if (status == TTSCacheStatus.Valid)
             {
-                return null;
+                var clip = ttsCache.LoadClipFromDisk(langName, hash, $"{langName}_{hash}");
+                if (clip != null)
+                {
+                    ttsCache.SetMemoryClip(langName, hash, clip);
+                    return clip;
+                }
+                status = TTSCacheStatus.Missing;
             }
+
+            return null;
         }
+
+        public TTSCacheStatus GetSpeechCacheStatus(string key)
+        {
+            var entry = translationDatabase?.Find(e => string.Equals(e.key, key, StringComparison.OrdinalIgnoreCase));
+            if (entry == null) return TTSCacheStatus.Missing;
+
+            string langName = currentLanguage.ToString();
+            string speech = GetSpeechTextForLanguage(entry, currentLanguage);
+            string clean = LocalTTSCacheService.NormalizeSpeechText(speech);
+            string hash = LocalTTSCacheService.ComputeSpeechHash(langName, clean);
+            return ttsCache.GetStatus(key, langName, hash, out _);
+        }
+
+        public bool IsSpeechCached(string key) => GetSpeechCacheStatus(key) == TTSCacheStatus.Valid;
+
+        public string GetTrainingJsonPath() => TrainingJsonPath;
+
+        public string GetTTSCachePath() => ttsCache.CacheRootPath;
 
         // ─────────────────────────────────────────────────────
         // VR TELEPORTATION & MOVEMENT
@@ -695,7 +984,8 @@ namespace TruckTyreReplacement.Core
             var titleGo = new GameObject("TitleText", typeof(RectTransform));
             titleGo.transform.SetParent(languageSelectionPanel.transform, false);
             var titleTmp = titleGo.AddComponent<TextMeshProUGUI>();
-            if (devanagariFont != null) titleTmp.font = devanagariFont;
+            var hindiTitleFont = GetFontForLanguage(LocalTTSLanguage.Hindi);
+            if (hindiTitleFont != null) titleTmp.font = hindiTitleFont;
             titleTmp.text = "SELECT LANGUAGE\n<size=24>भाषा चुनें | ଭାଷା ଚୟନ କରନ୍ତୁ</size>";
             titleTmp.alignment = TextAlignmentOptions.Center;
             titleTmp.fontSize = 28;
@@ -704,10 +994,10 @@ namespace TruckTyreReplacement.Core
             titleRect.anchoredPosition = new Vector2(0, 160);
             titleRect.sizeDelta = new Vector2(480, 80);
 
-            // Buttons with native fonts
-            CreateLanguageBtn("EnglishButton", "ENGLISH", new Vector2(0, 50), LocalTTSLanguage.English, englishFont);
-            CreateLanguageBtn("HindiButton", "हिन्दी", new Vector2(0, -40), LocalTTSLanguage.Hindi, devanagariFont);
-            CreateLanguageBtn("OdiaButton", "ଓଡ଼ିଆ", new Vector2(0, -130), LocalTTSLanguage.Odia, odiaFont);
+            // Buttons with native fonts, resolved generically via GetFontForLanguage
+            CreateLanguageBtn("EnglishButton", "ENGLISH", new Vector2(0, 50), LocalTTSLanguage.English, GetFontForLanguage(LocalTTSLanguage.English));
+            CreateLanguageBtn("HindiButton", "हिन्दी", new Vector2(0, -40), LocalTTSLanguage.Hindi, GetFontForLanguage(LocalTTSLanguage.Hindi));
+            CreateLanguageBtn("OdiaButton", "ଓଡ଼ିଆ", new Vector2(0, -130), LocalTTSLanguage.Odia, GetFontForLanguage(LocalTTSLanguage.Odia));
         }
 
         private void CreateLanguageBtn(string goName, string label, Vector2 pos, LocalTTSLanguage lang, TMP_FontAsset font)
@@ -741,93 +1031,63 @@ namespace TruckTyreReplacement.Core
         }
 
         // ─────────────────────────────────────────────────────
-        // JSON IMPORT UTILITY
+        // FRAMEWORK VALIDATION (Editor + runtime diagnostics)
         // ─────────────────────────────────────────────────────
 
-        [ContextMenu("Import Training JSON")]
-        public void ImportTrainingJson()
+        public string BuildFrameworkValidationReport()
         {
-            string jsonText = "";
-            TextAsset jsonAsset = Resources.Load<TextAsset>("training");
-            if (jsonAsset != null)
+            var sb = new StringBuilder();
+            sb.AppendLine("[VEDANTA FRAMEWORK]");
+            sb.AppendLine();
+            sb.AppendLine("FONTS");
+            foreach (LocalTTSLanguage lang in Enum.GetValues(typeof(LocalTTSLanguage)))
             {
-                jsonText = jsonAsset.text;
+                var f = GetFontForLanguage(lang);
+                sb.AppendLine($"{lang} -> {(f != null ? "assigned (" + f.name + ")" : "MISSING")}");
             }
-            else
-            {
-                string jsonPath = Path.Combine(Application.dataPath, "LocalTTS/TrainingData/training.json");
-                if (!File.Exists(jsonPath))
-                {
-                    jsonPath = Path.Combine(Application.streamingAssetsPath, "LocalTTS/TrainingData/training.json");
-                }
-                if (File.Exists(jsonPath))
-                {
-                    jsonText = File.ReadAllText(jsonPath, System.Text.Encoding.UTF8);
-                }
-            }
+            sb.AppendLine();
+            sb.AppendLine("JSON");
+            sb.AppendLine($"Path -> {TrainingJsonPath}");
+            sb.AppendLine($"Exists -> {(File.Exists(TrainingJsonPath) ? "yes" : "no")}");
+            sb.AppendLine($"Entries -> {(translationDatabase != null ? translationDatabase.Count : 0)}");
+            sb.AppendLine();
+            sb.AppendLine("TTS CACHE");
+            sb.AppendLine($"Path -> {ttsCache.CacheRootPath}");
+            sb.AppendLine($"Manifest -> {(File.Exists(ttsCache.ManifestPath) ? "valid" : "missing")}");
 
-            if (string.IsNullOrEmpty(jsonText))
+            int valid = 0, outdated = 0, missing = 0;
+            if (translationDatabase != null)
             {
-                Debug.LogWarning("[Manager] training.json not found!");
-                return;
-            }
-
-            try
-            {
-                var root = JsonUtility.FromJson<JsonRoot>(jsonText);
-                if (root != null)
+                foreach (var entry in translationDatabase)
                 {
-                    translationDatabase.Clear();
-                    AddJsonEntry("welcome", root.welcome);
-                    AddJsonEntry("step0", root.step0);
-                    AddJsonEntry("step1", root.step1);
-                    AddJsonEntry("step2", root.step2);
-                    AddJsonEntry("low_pressure", root.low_pressure);
-                    AddJsonEntry("high_pressure", root.high_pressure);
-                    AddJsonEntry("correct_pressure", root.correct_pressure);
-                    AddJsonEntry("pipe_grab", root.pipe_grab);
-                    AddJsonEntry("air_filling", root.air_filling);
-                    AddJsonEntry("complete", root.complete);
-
-                    Debug.Log($"[Manager] Successfully imported {translationDatabase.Count} entries from training.json.");
+                    foreach (LocalTTSLanguage lang in Enum.GetValues(typeof(LocalTTSLanguage)))
+                    {
+                        string langName = lang.ToString();
+                        string speech = GetSpeechTextForLanguage(entry, lang);
+                        string hash = LocalTTSCacheService.ComputeSpeechHash(langName, LocalTTSCacheService.NormalizeSpeechText(speech));
+                        var status = ttsCache.GetStatus(entry.key, langName, hash, out _);
+                        if (status == TTSCacheStatus.Valid) valid++;
+                        else if (status == TTSCacheStatus.Outdated) outdated++;
+                        else missing++;
+                    }
                 }
             }
-            catch (Exception ex)
-            {
-                Debug.LogError($"[Manager] Failed to parse training.json: {ex.Message}");
-            }
+            sb.AppendLine($"Valid -> {valid}");
+            sb.AppendLine($"Outdated -> {outdated}");
+            sb.AppendLine($"Missing -> {missing}");
+            sb.AppendLine();
+            sb.AppendLine("UI");
+            sb.AppendLine($"TrainingInstructionCanvas -> {(FindTrainingInstructionCanvas() != null ? "assigned" : "missing")}");
+            sb.AppendLine($"Localized targets -> {localizedTextTargets.Count}");
+            sb.AppendLine($"Voice AudioSource -> {(voiceAudioSource != null ? "assigned" : "missing")}");
+            sb.AppendLine($"SFX AudioSource -> {(sfxAudioSource != null ? "assigned" : "missing")}");
+            return sb.ToString();
         }
 
-        private void AddJsonEntry(string key, JsonEntry raw)
+        [ContextMenu("Validate Framework")]
+        public void LogFrameworkValidationReport()
         {
-            if (raw == null) return;
-            translationDatabase.Add(new TranslationEntry
-            {
-                key = key,
-                englishDisplay = raw.display?.en ?? "",
-                englishSpeech = raw.speech?.en ?? "",
-                hindiDisplay = raw.display?.hi ?? "",
-                hindiSpeech = raw.speech?.hi ?? "",
-                odiaDisplay = raw.display?.or ?? "",
-                odiaSpeech = raw.speech?.or ?? ""
-            });
-        }
-
-        [Serializable] private class JsonTranslations { public string en; public string hi; public string or; }
-        [Serializable] private class JsonEntry { public JsonTranslations display; public JsonTranslations speech; }
-        [Serializable]
-        private class JsonRoot
-        {
-            public JsonEntry welcome;
-            public JsonEntry step0;
-            public JsonEntry step1;
-            public JsonEntry step2;
-            public JsonEntry low_pressure;
-            public JsonEntry high_pressure;
-            public JsonEntry correct_pressure;
-            public JsonEntry pipe_grab;
-            public JsonEntry air_filling;
-            public JsonEntry complete;
+            Debug.Log(BuildFrameworkValidationReport());
         }
     }
 }

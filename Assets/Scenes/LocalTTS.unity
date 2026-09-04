@@ -4093,37 +4093,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 699707373}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &598845213
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 598845214}
-  m_Layer: 0
-  m_Name: GameObject
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &598845214
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 598845213}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -2.26458, y: -14.4, z: 5.63018}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &601096547
 GameObject:
   m_ObjectHideFlags: 0
@@ -10264,10 +10233,18 @@ MonoBehaviour:
   sfxAudioSource: {fileID: 1545028487}
   voiceVolume: 1
   interruptCurrentSpeech: 1
-  englishFont: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
-  devanagariFont: {fileID: 11400000, guid: 1419f48211c0296428ecb69c8ac798de, type: 2}
-  odiaFont: {fileID: 11400000, guid: 17bbc2e03943ebb489b966f313e8a4de, type: 2}
+  languageFonts:
+  - language: 0
+    font: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  - language: 1
+    font: {fileID: 11400000, guid: 1419f48211c0296428ecb69c8ac798de, type: 2}
+  - language: 2
+    font: {fileID: 11400000, guid: 17bbc2e03943ebb489b966f313e8a4de, type: 2}
+  fallbackFont: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
+  localizedTextTargets: []
   translationDatabase: []
+  monitorExternalTrainingJson: 1
+  jsonCheckInterval: 2
   debugMode: 0
 --- !u!21 &1561537743
 Material:
@@ -27552,4 +27529,3 @@ SceneRoots:
   - {fileID: 1367025452}
   - {fileID: 1380050011}
   - {fileID: 668711360}
-  - {fileID: 598845214}
