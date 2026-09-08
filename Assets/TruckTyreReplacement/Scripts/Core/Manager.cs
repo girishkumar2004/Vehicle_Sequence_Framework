@@ -132,6 +132,22 @@ namespace TruckTyreReplacement.Core
         private bool sequenceStarted = false;
         public bool IsLanguageSelected { get; private set; } = false;
         public LocalTTSLanguage CurrentLanguage => currentLanguage;
+
+        // ── Training preflight/preparation ──────────────────
+        private TrainingPreflightManager preflightManager;
+        public bool IsTrainingStarted { get; private set; } = false;
+        public TrainingPreflightState PreflightState => preflightManager != null ? preflightManager.State : TrainingPreflightState.Idle;
+
+        // Default is the safe, always-unavailable stub - no Player build may ever
+        // depend on Python/subprocess/ONNX. A future real on-device backend can be
+        // assigned here (e.g. by another component in Awake) without any change to
+        // Manager or TrainingPreflightManager.
+        private IRuntimeTTSService runtimeTTSService = new NullRuntimeTTSService();
+        public IRuntimeTTSService RuntimeTTSService
+        {
+            get => runtimeTTSService;
+            set => runtimeTTSService = value ?? new NullRuntimeTTSService();
+        }
         public bool IsSpeaking => isSpeaking;
 
         public event Action<LocalTTSLanguage> OnLanguageChanged;
@@ -153,6 +169,7 @@ namespace TruckTyreReplacement.Core
             if (Instance == null)
             {
                 Instance = this;
+                if (transform.parent != null) transform.SetParent(null);
                 DontDestroyOnLoad(gameObject);
                 InitializeManager();
             }
@@ -164,6 +181,18 @@ namespace TruckTyreReplacement.Core
 
         private void InitializeManager()
         {
+#if UNITY_EDITOR
+            if (runtimeTTSService is NullRuntimeTTSService)
+            {
+                runtimeTTSService = new EditorRuntimeTTSService();
+            }
+#endif
+            preflightManager = GetComponent<TrainingPreflightManager>();
+            if (preflightManager == null)
+            {
+                preflightManager = gameObject.AddComponent<TrainingPreflightManager>();
+            }
+
             // Setup voice AudioSource
             if (voiceAudioSource == null)
             {
@@ -286,12 +315,228 @@ namespace TruckTyreReplacement.Core
 
             OnLanguageChanged?.Invoke(lang);
 
-            // Start the sequence exactly once after language selection is finalized
+            // The sequence no longer starts immediately here - a training
+            // preflight/preparation check must report Ready first. See
+            // BeginTrainingPreflightIfNeeded(), triggered by the NextButton.
+            if (!sequenceStarted)
+            {
+                var anchor = FindTrainingHologramAnchor();
+                if (anchor != null)
+                {
+                    anchor.ShowPrestartPrompt();
+                }
+            }
+        }
+
+        // ─────────────────────────────────────────────────────
+        // TRAINING PREFLIGHT / PREPARATION
+        // ─────────────────────────────────────────────────────
+
+        private TruckTyreReplacement.UI.TrainingHologramAnchor FindTrainingHologramAnchor()
+        {
+            return UnityEngine.Object.FindFirstObjectByType<TruckTyreReplacement.UI.TrainingHologramAnchor>();
+        }
+
+        /// <summary>
+        /// Entry point for the NextButton once a language has been selected but
+        /// training has not yet started. Runs the preflight check and, only on
+        /// success, starts SequenceHandler. Never touches SequenceHandler itself
+        /// before that - SequenceHandler.Init() is the sole progression entry
+        /// point, called exactly once, only after Ready.
+        /// </summary>
+        public void BeginTrainingPreflightIfNeeded()
+        {
+            if (IsTrainingStarted) return;
+
+            var anchor = FindTrainingHologramAnchor();
+
+            if (preflightManager == null)
+            {
+                // No preflight component available - do not block training entirely.
+                StartTrainingSequence();
+                return;
+            }
+
+            if (anchor != null)
+            {
+                preflightManager.OnPreflightUpdated -= anchor.ShowPreflightState;
+                preflightManager.OnPreflightUpdated += anchor.ShowPreflightState;
+            }
+
+            preflightManager.RunPreflight(this, StartTrainingSequence);
+        }
+
+        private void StartTrainingSequence()
+        {
+            if (IsTrainingStarted) return;
             if (!sequenceStarted && SequenceHandler.instance != null)
             {
                 sequenceStarted = true;
+                IsTrainingStarted = true;
+
+                // The preflight UI temporarily used the title field ("READY", etc.);
+                // clear it before real task content begins, since no task in the
+                // normal flow otherwise manages the title.
+                var anchor = FindTrainingHologramAnchor();
+                if (anchor != null) anchor.SetTitle("");
+
                 SequenceHandler.instance.Init();
             }
+        }
+
+        /// <summary>
+        /// All (key, language) pairs in the current translation database that
+        /// have non-empty speech text - the generic checklist a preflight check
+        /// iterates. Contains no module-specific keys.
+        /// </summary>
+        public List<(string key, string language)> GetTrainingContentCheckItems()
+        {
+            var items = new List<(string key, string language)>();
+            if (translationDatabase == null) return items;
+
+            foreach (var entry in translationDatabase)
+            {
+                foreach (LocalTTSLanguage lang in Enum.GetValues(typeof(LocalTTSLanguage)))
+                {
+                    string speech = GetSpeechTextForLanguage(entry, lang);
+                    if (string.IsNullOrEmpty(speech)) continue;
+                    items.Add((entry.key, lang.ToString()));
+                }
+            }
+            return items;
+        }
+
+        /// <summary>
+        /// Resolves the current cache status for one (key, language) pair using
+        /// the same hashing/manifest logic Speak() uses - no second implementation.
+        /// </summary>
+        public TTSCacheStatus CheckOneEntry(string key, string language)
+        {
+            var entry = translationDatabase?.Find(e => string.Equals(e.key, key, StringComparison.OrdinalIgnoreCase));
+            if (entry == null || !Enum.TryParse<LocalTTSLanguage>(language, out var lang)) return TTSCacheStatus.Missing;
+
+            string speech = GetSpeechTextForLanguage(entry, lang);
+            string clean = LocalTTSCacheService.NormalizeSpeechText(speech);
+            string hash = LocalTTSCacheService.ComputeSpeechHash(language, clean);
+            return ttsCache.GetStatus(key, language, hash, out _);
+        }
+
+        /// <summary>One (key, language) entry's full audio-readiness data, used by the preflight repair pipeline.</summary>
+        public struct TrainingAudioCheckItem
+        {
+            public string key;
+            public string language;
+            public string normalizedSpeech;
+            public string hash;
+            public string expectedPath;
+            public TTSCacheStatus status;
+        }
+
+        /// <summary>
+        /// Richer version of GetTrainingContentCheckItems/CheckOneEntry that
+        /// returns hash/expected-path/status in one pass, for the preflight
+        /// repair pipeline. Reuses the exact same hashing/status logic - no
+        /// second implementation.
+        /// </summary>
+        public List<TrainingAudioCheckItem> GetTrainingAudioCheckItems()
+        {
+            var items = new List<TrainingAudioCheckItem>();
+            if (translationDatabase == null) return items;
+
+            foreach (var entry in translationDatabase)
+            {
+                foreach (LocalTTSLanguage lang in Enum.GetValues(typeof(LocalTTSLanguage)))
+                {
+                    string speech = GetSpeechTextForLanguage(entry, lang);
+                    if (string.IsNullOrEmpty(speech)) continue;
+
+                    string langName = lang.ToString();
+                    string norm = LocalTTSCacheService.NormalizeSpeechText(speech);
+                    string hash = LocalTTSCacheService.ComputeSpeechHash(langName, norm);
+                    var status = ttsCache.GetStatus(entry.key, langName, hash, out string expectedPath);
+
+                    items.Add(new TrainingAudioCheckItem
+                    {
+                        key = entry.key,
+                        language = langName,
+                        normalizedSpeech = norm,
+                        hash = hash,
+                        expectedPath = expectedPath,
+                        status = status
+                    });
+                }
+            }
+            return items;
+        }
+
+        /// <summary>Scratch directory for in-progress runtime generation, under the same cache root used at runtime.</summary>
+        public string GetTempGenerationDirectory()
+        {
+            string dir = Path.Combine(ttsCache.CacheRootPath, "_generating");
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        /// <summary>
+        /// Validates a freshly generated WAV and, only if valid, commits it into
+        /// the cache and updates the manifest for every key that shares this
+        /// exact (language, hash) - preserving content-addressed deduplication
+        /// (e.g. welcome/step0 sharing identical text must both become ready
+        /// from the one physical file, without generating it twice).
+        /// </summary>
+        public bool TryCommitGeneratedAudio(IEnumerable<string> keysSharingThisHash, string language, string hash, string tempWavPath, string speechText, out string failureReason)
+        {
+            failureReason = null;
+
+            if (!File.Exists(tempWavPath))
+            {
+                failureReason = "Generated file not found.";
+                return false;
+            }
+
+            byte[] bytes;
+            try
+            {
+                bytes = File.ReadAllBytes(tempWavPath);
+            }
+            catch (Exception ex)
+            {
+                failureReason = "Failed to read generated file: " + ex.Message;
+                return false;
+            }
+
+            var clip = ttsCache.WavToAudioClip(bytes, $"{language}_{hash}", out string wavFailure);
+            if (clip == null)
+            {
+                failureReason = "Generated WAV failed validation: " + wavFailure;
+                return false;
+            }
+            if (clip.length <= 0f)
+            {
+                failureReason = "Generated WAV validated but has zero length.";
+                return false;
+            }
+
+            ttsCache.WriteClipBytes(language, hash, bytes);
+            string fileName = ttsCache.GetCacheFileName(language, hash);
+
+            foreach (var key in keysSharingThisHash)
+            {
+                ttsCache.UpsertManifestEntry(key, language, hash, fileName, speechText);
+            }
+            ttsCache.SaveManifest();
+
+            foreach (var key in keysSharingThisHash)
+            {
+                var verify = ttsCache.GetStatus(key, language, hash, out _);
+                if (verify != TTSCacheStatus.Valid)
+                {
+                    failureReason = $"Post-generation verification for '{key}' reported {verify} instead of Valid.";
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         private void EnsureLanguageFonts()
@@ -613,13 +858,36 @@ namespace TruckTyreReplacement.Core
             bool loaded = LoadTrainingDataFromDisk(logIfMissing: true);
             if (!loaded) return;
 
+            // The TTS cache manifest is memoized in-memory; an external Editor
+            // tool (or another process) may have regenerated WAVs and updated
+            // cache_manifest.json on disk since we last read it. Force a fresh
+            // read here so status/preload reflect the current disk state.
+            ttsCache.LoadManifest(forceReload: true);
+
             var newHashes = SnapshotSpeechHashes();
+            var changedKeys = new List<string>();
             foreach (var kvp in newHashes)
             {
                 if (previousHashes.TryGetValue(kvp.Key, out string oldHash) && oldHash != kvp.Value)
                 {
-                    Debug.Log($"[JSON] Speech content changed for '{kvp.Key}'. Previously cached audio for the old hash is now OUTDATED.");
+                    int sep = kvp.Key.LastIndexOf('|');
+                    string entryKey = sep >= 0 ? kvp.Key.Substring(0, sep) : kvp.Key;
+                    string langName = sep >= 0 ? kvp.Key.Substring(sep + 1) : "";
+                    changedKeys.Add(kvp.Key);
+
+                    Debug.Log($"[TTS INVALIDATED]\nKey = {entryKey}\nLanguage = {langName}\nOldHash = {oldHash}\nNewHash = {kvp.Value}");
+
+                    // The old AudioClip (keyed by language+oldHash) must never be returned
+                    // again for this key now that the speech text has changed. This affects
+                    // CONTENT/cache state only - it must never call into SequenceHandler or
+                    // any task-completion API.
+                    ttsCache.InvalidateMemoryClip(langName, oldHash);
                 }
+            }
+
+            if (changedKeys.Count > 0)
+            {
+                Debug.Log($"[JSON RELOAD]\nChangedKeys = {string.Join(", ", changedKeys)}");
             }
 
             PrepopulateFonts();
@@ -818,14 +1086,18 @@ namespace TruckTyreReplacement.Core
 
                 if (clipToPlay != null && voiceAudioSource != null)
                 {
+                    Debug.Log($"[TTS RESOLVED]\nKey = {request.key}\nLanguage = {langName}\nHash = {hash}\nStatus = VALID");
+
+                    voiceAudioSource.Stop();
                     voiceAudioSource.clip = clipToPlay;
                     voiceAudioSource.volume = voiceVolume;
                     voiceAudioSource.Play();
 
-                    Debug.Log($"[TTS PLAYBACK]\nPlaying external cached WAV\nKey = {request.key}\nLanguage = {langName}\nPath = {expectedPath}");
+                    Debug.Log($"[TTS PLAY START]\nKey = {request.key}\nLanguage = {langName}\nHash = {hash}\nClip = {clipToPlay.name}");
 
                     // Wait for playback to actually begin, then for it to finish -
-                    // never assume completion purely from clip.length.
+                    // never assume completion purely from clip.length, and never treat
+                    // isPlaying==false immediately after Play() as completion.
                     float safetyTimeout = clipToPlay.length * 2f + 1f;
                     float waited = 0f;
                     while (!voiceAudioSource.isPlaying && waited < 1f)
@@ -833,15 +1105,25 @@ namespace TruckTyreReplacement.Core
                         waited += Time.deltaTime;
                         yield return null;
                     }
-                    waited = 0f;
-                    while (voiceAudioSource.isPlaying && waited < safetyTimeout)
+
+                    if (!voiceAudioSource.isPlaying)
                     {
-                        waited += Time.deltaTime;
-                        yield return null;
+                        Debug.LogWarning($"[TTS PLAY FAILED]\nKey = {request.key}\nLanguage = {langName}\nHash = {hash}\nReason = AudioSource never reported isPlaying after Play()");
+                    }
+                    else
+                    {
+                        waited = 0f;
+                        while (voiceAudioSource.isPlaying && waited < safetyTimeout)
+                        {
+                            waited += Time.deltaTime;
+                            yield return null;
+                        }
+                        Debug.Log($"[TTS PLAY COMPLETE]\nKey = {request.key}\nLanguage = {langName}\nHash = {hash}");
                     }
                 }
                 else
                 {
+                    Debug.LogWarning($"[TTS BLOCKED]\nKey = {request.key}\nLanguage = {langName}\nStatus = {status.ToString().ToUpperInvariant()}");
                     Debug.LogWarning($"[TTS MISSING]\nKey = {request.key}\nLanguage = {langName}\nSpeech = {request.text}\nExpectedPath = {expectedPath}");
                     yield return new WaitForSeconds(1.0f);
                 }

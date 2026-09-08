@@ -583,47 +583,68 @@ public class SequenceHelperFunctions : MonoBehaviour
     private IEnumerator PlayLocaleAudioRoutine(string key, bool triggerNextTask)
     {
         var mgr = Manager.Instance != null ? Manager.Instance : UnityEngine.Object.FindFirstObjectByType<Manager>();
-        if (mgr != null)
+
+        if (mgr == null)
         {
-            Debug.Log($"[SequenceHelperFunctions][TTS] PlayLocaleAudio key='{key}' language={mgr.CurrentLanguage}");
-            mgr.Speak(key);
-
-            AudioSource source = mgr.GetVoiceAudioSource();
-            Debug.Log($"[SequenceHelperFunctions][TTS] AudioSource: {(source != null ? source.gameObject.name : "NULL")} enabled={source?.enabled} volume={source?.volume}");
-
-            if (source != null)
-            {
-                // Phase 1: wait up to 1s for Manager.IsSpeaking to become true (Speak() is async/queued)
-                float waitStart = Time.realtimeSinceStartup;
-                yield return new WaitUntil(() => mgr.IsSpeaking || (Time.realtimeSinceStartup - waitStart) > 1.0f);
-
-                // Phase 2: wait up to 0.5s for AudioSource.isPlaying to become true
-                waitStart = Time.realtimeSinceStartup;
-                yield return new WaitUntil(() => source.isPlaying || (Time.realtimeSinceStartup - waitStart) > 0.5f);
-
-                Debug.Log($"[SequenceHelperFunctions][TTS] isPlaying={source.isPlaying} clip={source.clip?.name} length={source.clip?.length}s");
-
-                if (source.isPlaying)
-                {
-                    // Phase 3: wait for audio to finish
-                    yield return new WaitUntil(() => !source.isPlaying && !mgr.IsSpeaking);
-                    Debug.Log($"[SequenceHelperFunctions][TTS] Audio finished for key='{key}'");
-                }
-                else
-                {
-                    // Audio never started — missing clip or not preloaded
-                    Debug.LogWarning($"[SequenceHelperFunctions][TTS] Audio did NOT start for key='{key}'. Check Manager translation database and preloaded audio cache.");
-                    yield return new WaitForSeconds(1.0f);
-                }
-            }
-
-            yield return new WaitForSeconds(0.3f);
-        }
-        else
-        {
+            // No localization/TTS system available at all - this is not a content
+            // (missing/outdated audio) condition, so preserve the original fallback
+            // rather than permanently blocking the task.
             Debug.LogWarning("[SequenceHelperFunctions][TTS] Manager instance unavailable — cannot play audio.");
             yield return new WaitForSeconds(1.0f);
+            if (triggerNextTask) handler.TaskCompleted();
+            else handler.CurrentTaskCompleted();
+            yield break;
         }
+
+        Debug.Log($"[SequenceHelperFunctions][TTS] PlayLocaleAudio key='{key}' language={mgr.CurrentLanguage}");
+        mgr.Speak(key);
+
+        AudioSource source = mgr.GetVoiceAudioSource();
+        Debug.Log($"[SequenceHelperFunctions][TTS] AudioSource: {(source != null ? source.gameObject.name : "NULL")} enabled={source?.enabled} volume={source?.volume}");
+
+        bool audioActuallyCompleted = false;
+
+        if (source != null)
+        {
+            // Phase 1: wait up to 1s for Manager.IsSpeaking to become true (Speak() is async/queued)
+            float waitStart = Time.realtimeSinceStartup;
+            yield return new WaitUntil(() => mgr.IsSpeaking || (Time.realtimeSinceStartup - waitStart) > 1.0f);
+
+            // Phase 2: wait up to 0.5s for AudioSource.isPlaying to become true
+            waitStart = Time.realtimeSinceStartup;
+            yield return new WaitUntil(() => source.isPlaying || (Time.realtimeSinceStartup - waitStart) > 0.5f);
+
+            Debug.Log($"[SequenceHelperFunctions][TTS] isPlaying={source.isPlaying} clip={source.clip?.name} length={source.clip?.length}s");
+
+            if (source.isPlaying)
+            {
+                // Phase 3: wait for audio to actually finish. This - not the mere
+                // absence of isPlaying right after Play(), and not a fixed delay -
+                // is the only condition that counts as real playback completion.
+                yield return new WaitUntil(() => !source.isPlaying && !mgr.IsSpeaking);
+                Debug.Log($"[TTS PLAY COMPLETE]\nKey = {key}\nLanguage = {mgr.CurrentLanguage}");
+                audioActuallyCompleted = true;
+            }
+            else
+            {
+                // Audio never started - missing/outdated cached WAV, or generation
+                // still pending. This is CONTENT state, not TASK state: the task
+                // must remain running, not silently complete. A human can still
+                // advance manually via the Next button once speech settles.
+                var status = mgr.GetSpeechCacheStatus(key);
+                Debug.LogWarning($"[TTS BLOCKED]\nKey = {key}\nLanguage = {mgr.CurrentLanguage}\nReason = {status.ToString().ToUpperInvariant()}");
+                yield return new WaitUntil(() => !mgr.IsSpeaking);
+            }
+        }
+
+        if (!audioActuallyCompleted)
+        {
+            // Do not call TaskCompleted()/CurrentTaskCompleted() - a JSON/TTS content
+            // condition (missing or outdated audio) must never drive task progression.
+            yield break;
+        }
+
+        yield return new WaitForSeconds(0.3f);
 
         if (triggerNextTask) handler.TaskCompleted();
         else handler.CurrentTaskCompleted();
@@ -694,6 +715,7 @@ public class SequenceHelperFunctions : MonoBehaviour
             mgr.Speak("complete");
         }
 
+        bool completeAudioFinished = false;
         if (voiceSource != null && mgr != null)
         {
             float start = Time.realtimeSinceStartup;
@@ -702,12 +724,31 @@ public class SequenceHelperFunctions : MonoBehaviour
             if (voiceSource.isPlaying)
             {
                 yield return new WaitUntil(() => !voiceSource.isPlaying && !mgr.IsSpeaking);
+                Debug.Log("[TTS PLAY COMPLETE]\nKey = complete\nLanguage = " + mgr.CurrentLanguage);
+                completeAudioFinished = true;
+            }
+            else
+            {
+                var status = mgr.GetSpeechCacheStatus("complete");
+                Debug.LogWarning($"[TTS BLOCKED]\nKey = complete\nLanguage = {mgr.CurrentLanguage}\nReason = {status.ToString().ToUpperInvariant()}");
+                yield return new WaitUntil(() => !mgr.IsSpeaking);
             }
         }
         else
         {
+            // No Manager/voice source at all - genuinely different failure mode from
+            // missing/outdated content, preserve prior fallback so training doesn't
+            // hard-lock with no TTS system present.
             yield return new WaitForSeconds(2.0f);
+            completeAudioFinished = true;
         }
+
+        if (!completeAudioFinished)
+        {
+            // Missing/outdated "complete" audio must not silently finish training.
+            yield break;
+        }
+
         Debug.Log("[AUDIO FLOW] complete TTS COMPLETE -> TRAINING COMPLETE");
 
         if (handler == null) handler = SequenceHandler.instance != null ? SequenceHandler.instance : GetComponent<SequenceHandler>();
@@ -763,10 +804,9 @@ public class SequenceHelperFunctions : MonoBehaviour
         var colObj = obj.GetComponent<Collider>();
         if (colObj != null) colObj.enabled = true;
 
-        var nvc = UnityEngine.Object.FindFirstObjectByType<NumericVariableController>();
-        if (nvc != null && (obj.name == "Curves pipe" || obj.name.Contains("Pipe")))
+        if (obj.name == "Curves pipe" || obj.name.Contains("Pipe"))
         {
-            nvc.EnablePipeInteraction();
+            EnablePipeInteraction();
         }
 
         GrabDetect gd = obj.GetComponent<GrabDetect>();
@@ -781,6 +821,141 @@ public class SequenceHelperFunctions : MonoBehaviour
         if (obj == null) return;
         GrabDetect gd = obj.GetComponent<GrabDetect>();
         if (gd != null) gd.DeactivateGrab();
+    }
+
+    /// <summary>
+    /// Enables Curves pipe interaction and positions player for air filling step.
+    /// Wire from Sequence EventsToFollow.
+    /// </summary>
+    public void EnablePipeInteraction()
+    {
+        var pipe = GameObject.Find("Curves pipe");
+        if (pipe == null)
+        {
+            var allGOs = UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            foreach (var g in allGOs) if (g.name == "Curves pipe") { pipe = g; break; }
+        }
+
+        if (pipe != null)
+        {
+            pipe.SetActive(true);
+
+            var airfillPoint = GameObject.Find("AirfillPoint");
+            if (airfillPoint != null)
+            {
+                var mgr = Manager.Instance != null ? Manager.Instance : UnityEngine.Object.FindFirstObjectByType<Manager>();
+                if (mgr != null) mgr.MovePlayerTo(airfillPoint.transform);
+            }
+
+            var grab = pipe.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+            if (grab == null) grab = pipe.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
+
+            if (grab != null)
+            {
+                grab.enabled = true;
+                grab.interactionLayers = -1;
+                grab.movementType = UnityEngine.XR.Interaction.Toolkit.Interactables.XRBaseInteractable.MovementType.Instantaneous;
+                grab.trackPosition = true;
+                grab.trackRotation = true;
+                grab.throwOnDetach = false;
+
+                if (grab.interactionManager == null)
+                {
+                    grab.interactionManager = UnityEngine.Object.FindFirstObjectByType<UnityEngine.XR.Interaction.Toolkit.XRInteractionManager>();
+                }
+
+                var col = pipe.GetComponent<Collider>();
+                if (col != null && !grab.colliders.Contains(col))
+                {
+                    col.enabled = true;
+                    grab.colliders.Add(col);
+                }
+            }
+
+            var colBox = pipe.GetComponent<BoxCollider>();
+            if (colBox != null)
+            {
+                colBox.enabled = true;
+                colBox.isTrigger = false;
+                colBox.size = new Vector3(0.005f, 0.015f, 0.01f);
+                colBox.center = Vector3.zero;
+            }
+
+            var rb = pipe.GetComponent<Rigidbody>();
+            if (rb == null) rb = pipe.AddComponent<Rigidbody>();
+            if (rb != null)
+            {
+                rb.isKinematic = true;
+                rb.useGravity = false;
+            }
+
+            GrabDetect gd = pipe.GetComponent<GrabDetect>();
+            if (gd == null) gd = pipe.AddComponent<GrabDetect>();
+            gd.ActivateGrab();
+
+            ApplySafeGhostHighlight(pipe);
+            Debug.Log("[SequenceHelperFunctions] EnablePipeInteraction: Curves pipe activated and highlighted.");
+        }
+    }
+
+    /// <summary>Called by GrabDetect when Curves pipe is grabbed. Executes air filling routine and completes task.</summary>
+    public void OnPipeGrabbed()
+    {
+        StartCoroutine(PipeGrabCompletionRoutine());
+    }
+
+    private IEnumerator PipeGrabCompletionRoutine()
+    {
+        var mgr = Manager.Instance != null ? Manager.Instance : UnityEngine.Object.FindFirstObjectByType<Manager>();
+        if (mgr != null) mgr.StopSpeech();
+
+        var pipe = GameObject.Find("Curves pipe");
+        if (pipe != null)
+        {
+            RemoveSafeGhostHighlight(pipe);
+            pipe.SetActive(false);
+        }
+
+        var allGOs = UnityEngine.Object.FindObjectsByType<GameObject>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var g in allGOs)
+        {
+            if (g.name == "pipe 2")
+            {
+                g.SetActive(true);
+                break;
+            }
+        }
+
+        Debug.Log("[AUDIO FLOW] Air Filling Sound START");
+        AudioClip airFillClip = Resources.Load<AudioClip>("Audio/Air Filling Sound");
+        if (airFillClip == null) airFillClip = Resources.Load<AudioClip>("Air Filling Sound");
+
+        AudioSource sfxSource = mgr != null ? mgr.GetSFXAudioSource() : null;
+        if (airFillClip != null && mgr != null)
+        {
+            mgr.PlaySFX(airFillClip);
+            if (sfxSource != null)
+            {
+                float start = Time.realtimeSinceStartup;
+                yield return new WaitUntil(() => sfxSource.isPlaying || (Time.realtimeSinceStartup - start) > 0.5f);
+                if (sfxSource.isPlaying)
+                {
+                    yield return new WaitUntil(() => !sfxSource.isPlaying);
+                }
+            }
+            else
+            {
+                yield return new WaitForSeconds(airFillClip.length);
+            }
+        }
+        else
+        {
+            yield return new WaitForSeconds(1.5f);
+        }
+        Debug.Log("[AUDIO FLOW] Air Filling Sound COMPLETE");
+        yield return new WaitForSeconds(0.3f);
+
+        CompleteCurrentTask();
     }
 
     /// <summary>Called by GrabDetect when an object is grabbed. Completes current task.</summary>
