@@ -1,0 +1,32 @@
+fileFormatVersion: 2
+guid: 4fe82024ff3e38743ac3a4168e30c1d7
+PluginImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  iconMap: {}
+  executionOrder: {}
+  defineConstraints: []
+  isPreloaded: 0
+  isStandaloneCompatible: 1
+  ReadXmlDoc: 0
+  isExplicitlyReferenced: 0
+  validateReferences: 0
+  platformData:
+  - first:
+      Any: 1
+    second:
+      enabled: 1
+      excludePlatforms: []
+  - first:
+      Editor: 0
+    second:
+      enabled: 1
+      excludePlatforms: []
+  - first:
+      Windows Store Apps: 0
+    second:
+      enabled: 0
+      excludePlatforms: []
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
