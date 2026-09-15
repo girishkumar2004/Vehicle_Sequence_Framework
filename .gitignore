@@ -1,5 +1,9 @@
-# Only keep the Unity project folders
+# Ignore everything else
+/*
 
+# Only keep the Unity project folders
+# (negations must come AFTER the broad exclusion above - gitignore uses
+# last-match-wins, so listing "/*" last would silently re-exclude everything)
 !Assets/
 !Assets/**
 !Packages/
@@ -8,7 +12,13 @@
 !ProjectSettings/**
 !UserSettings/
 !UserSettings/**
+!.gitignore
 
-# Ignore everything else
-
-/*
+# Re-exclude generated/huge/machine-specific content that can live inside
+# the allowed folders above (re-excluding a nested path under an already
+# included tree is fine in gitignore - only the reverse direction is not).
+**/.venv/
+**/venv/
+**/__pycache__/
+*.pyc
+Assets/LocalTTS/Models/**/*.safetensors
