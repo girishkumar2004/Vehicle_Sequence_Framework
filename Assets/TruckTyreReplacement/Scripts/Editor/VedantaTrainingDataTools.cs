@@ -24,10 +24,17 @@ namespace TruckTyreReplacement.EditorTools
         [MenuItem("Vedanta Training Data/Deploy Training JSON")]
         public static void DeployTrainingJson()
         {
+            DeployTrainingJsonWithResult(out _);
+        }
+
+        public static bool DeployTrainingJsonWithResult(out string failureReason)
+        {
+            failureReason = null;
             if (!File.Exists(DevJsonSourcePath))
             {
-                Debug.LogError($"[VEDANTA DEPLOY] Source training.json not found at {DevJsonSourcePath}");
-                return;
+                failureReason = $"Source training.json not found at {DevJsonSourcePath}";
+                Debug.LogError($"[VEDANTA DEPLOY] {failureReason}");
+                return false;
             }
 
             string destPath = Path.Combine(Application.persistentDataPath, "TrainingData", "training.json");
@@ -41,21 +48,31 @@ namespace TruckTyreReplacement.EditorTools
                 }
                 File.Copy(DevJsonSourcePath, destPath, overwrite: true);
                 Debug.Log($"[VEDANTA DEPLOY]\nSource = {DevJsonSourcePath}\nDestination = {destPath}");
+                return true;
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[VEDANTA DEPLOY] Failed to deploy training.json.\nException = {ex.Message}");
+                failureReason = $"Failed to deploy training.json: {ex.Message}";
+                Debug.LogError($"[VEDANTA DEPLOY] {failureReason}");
+                return false;
             }
         }
 
         [MenuItem("Vedanta Training Data/Migrate Legacy Audio Cache")]
         public static void MigrateLegacyAudioCache()
         {
+            MigrateLegacyAudioCacheWithResult(out _, out _, out _);
+        }
+
+        public static bool MigrateLegacyAudioCacheWithResult(out int migrated, out int skipped, out string failureReason)
+        {
+            migrated = 0; skipped = 0; failureReason = null;
             string destJsonPath = Path.Combine(Application.persistentDataPath, "TrainingData", "training.json");
             if (!File.Exists(destJsonPath))
             {
-                Debug.LogWarning("[VEDANTA MIGRATE] No deployed training.json found at persistentDataPath. Run 'Deploy Training JSON' first.");
-                return;
+                failureReason = "No deployed training.json found at persistentDataPath. Run 'Deploy Training JSON' first.";
+                Debug.LogWarning($"[VEDANTA MIGRATE] {failureReason}");
+                return false;
             }
 
             string jsonText;
@@ -65,8 +82,9 @@ namespace TruckTyreReplacement.EditorTools
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[VEDANTA MIGRATE] Failed to read deployed training.json.\nException = {ex.Message}");
-                return;
+                failureReason = $"Failed to read deployed training.json: {ex.Message}";
+                Debug.LogError($"[VEDANTA MIGRATE] {failureReason}");
+                return false;
             }
 
             JsonRootV2 root;
@@ -76,19 +94,20 @@ namespace TruckTyreReplacement.EditorTools
             }
             catch (Exception ex)
             {
-                Debug.LogError($"[VEDANTA MIGRATE] Failed to parse deployed training.json.\nException = {ex.Message}");
-                return;
+                failureReason = $"Failed to parse deployed training.json: {ex.Message}";
+                Debug.LogError($"[VEDANTA MIGRATE] {failureReason}");
+                return false;
             }
 
             if (root == null || root.entries == null)
             {
-                Debug.LogError("[VEDANTA MIGRATE] Deployed training.json has no entries.");
-                return;
+                failureReason = "Deployed training.json has no entries.";
+                Debug.LogError($"[VEDANTA MIGRATE] {failureReason}");
+                return false;
             }
 
             string cacheRoot = Path.Combine(Application.persistentDataPath, "LocalTTSCache");
             var languages = new[] { "English", "Hindi", "Odia" };
-            int migrated = 0, skipped = 0;
             var manifestEntries = new List<ManifestEntryForWrite>();
 
             foreach (var entry in root.entries)
@@ -100,9 +119,6 @@ namespace TruckTyreReplacement.EditorTools
                     string speechText = GetSpeech(entry, lang);
                     if (string.IsNullOrEmpty(speechText)) continue;
 
-                    // Locate the legacy WAV using the ORIGINAL 4-byte MD5 cache-key
-                    // algorithm the pre-refactor Manager used, so already-generated
-                    // audio is preserved instead of left behind.
                     string legacyNormalized = NormalizeLegacy(speechText);
                     string legacyHash = LegacyMD5Hash(legacyNormalized);
                     string legacyFileName = $"{lang}_{legacyHash}.wav";
@@ -144,6 +160,7 @@ namespace TruckTyreReplacement.EditorTools
             WriteManifest(cacheRoot, manifestEntries);
 
             Debug.Log($"[VEDANTA MIGRATE]\nMigrated = {migrated}\nSkipped (no legacy audio match) = {skipped}\nCache root = {cacheRoot}");
+            return true;
         }
 
         [MenuItem("Vedanta Training Data/Open Persistent Data Folder")]
@@ -157,13 +174,22 @@ namespace TruckTyreReplacement.EditorTools
         [MenuItem("Vedanta Training Data/Validate Framework")]
         public static void ValidateFramework()
         {
+            ValidateFrameworkWithResult(out _, out _);
+        }
+
+        public static bool ValidateFrameworkWithResult(out string report, out string failureReason)
+        {
+            report = ""; failureReason = null;
             var manager = UnityEngine.Object.FindFirstObjectByType<Manager>();
             if (manager == null)
             {
-                Debug.LogWarning("[VEDANTA VALIDATE] No Manager instance found in the open scene.");
-                return;
+                failureReason = "No Manager instance found in the open scene.";
+                Debug.LogWarning($"[VEDANTA VALIDATE] {failureReason}");
+                return false;
             }
-            Debug.Log(manager.BuildFrameworkValidationReport());
+            report = manager.BuildFrameworkValidationReport();
+            Debug.Log(report);
+            return true;
         }
 
         // ─────────────────────────────────────────────────────

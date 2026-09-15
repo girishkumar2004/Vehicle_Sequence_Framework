@@ -81,11 +81,34 @@ namespace TruckTyreReplacement.UI
         }
 
         private float lastClickTime = -1f;
+        private bool preflightModeActive = false;
+
+        /// <summary>
+        /// When active, progress UI is shown regardless of the current task's
+        /// CompletionMode (see SetProgressVisible/LateUpdate below) - used only
+        /// while a training preflight/preparation check is displaying its own
+        /// progress before any task exists to check the mode of.
+        /// </summary>
+        public void SetPreflightMode(bool active)
+        {
+            preflightModeActive = active;
+        }
 
         public void OnNextButtonClicked()
         {
             if (Time.unscaledTime - lastClickTime < 0.35f) return;
             lastClickTime = Time.unscaledTime;
+
+            var mgrForGate = Core.Manager.Instance;
+            if (mgrForGate != null && mgrForGate.IsLanguageSelected && !mgrForGate.IsTrainingStarted)
+            {
+                // Training has not started yet - this click begins the preflight
+                // check (or is a no-op if one is already running). SequenceHandler
+                // must never be touched from here until preflight reports Ready.
+                Debug.Log("[TrainingInstructionPanel] Next button pressed pre-training — starting preflight check.");
+                mgrForGate.BeginTrainingPreflightIfNeeded();
+                return;
+            }
 
             var seq = SequenceHandler.instance != null ? SequenceHandler.instance : UnityEngine.Object.FindFirstObjectByType<SequenceHandler>();
             int currentTask = seq != null ? seq.currentTask : -1;
@@ -167,6 +190,16 @@ namespace TruckTyreReplacement.UI
             }
         }
 
+        /// <summary>
+        /// Sets the progress label's raw text directly (e.g. "18/30 audio files
+        /// ready"), bypassing SetProgress's percentage formatting. Used only by
+        /// the preflight/preparation UI.
+        /// </summary>
+        public void SetProgressTextRaw(string text)
+        {
+            if (progressText != null) progressText.text = text;
+        }
+
         public void SetNextVisible(bool visible)
         {
             if (nextButton != null)
@@ -210,7 +243,7 @@ namespace TruckTyreReplacement.UI
                 if (seq >= 0 && seq < seqList.Count && task >= 0 && task < seqList[seq].TaskList.Count)
                     isInteractionTask = seqList[seq].TaskList[task].completionMode == CompletionMode.Interaction;
             }
-            bool shouldShow = visible && isInteractionTask;
+            bool shouldShow = visible && (isInteractionTask || preflightModeActive);
 
             if (progressSlider != null) progressSlider.gameObject.SetActive(shouldShow);
             if (progressContainer != null) progressContainer.SetActive(shouldShow);
@@ -251,7 +284,7 @@ namespace TruckTyreReplacement.UI
                 bool isInteractionTask = seq >= 0 && seq < seqList.Count && task >= 0 && task < seqList[seq].TaskList.Count
                     && seqList[seq].TaskList[task].completionMode == CompletionMode.Interaction;
 
-                if (!isInteractionTask)
+                if (!isInteractionTask && !preflightModeActive)
                 {
                     if (progressContainer != null && progressContainer.activeSelf) progressContainer.SetActive(false);
                     if (progressSlider    != null && progressSlider.gameObject.activeSelf) progressSlider.gameObject.SetActive(false);

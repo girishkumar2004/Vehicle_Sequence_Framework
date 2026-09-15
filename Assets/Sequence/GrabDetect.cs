@@ -42,14 +42,16 @@ public class GrabDetect : MonoBehaviour
 
         Debug.Log("[Tyre] Curves pipe ACTUALLY GRABBED");
 
-        var nvc = UnityEngine.Object.FindFirstObjectByType<NumericVariableController>(UnityEngine.FindObjectsInactive.Include);
-        if (nvc != null && gameObject.name == "Curves pipe")
+        if (SequenceHelperFunctions.instance != null)
         {
-            nvc.OnPipeGrabbed();
-        }
-        else if (SequenceHelperFunctions.instance != null)
-        {
-            SequenceHelperFunctions.instance.OnObjectGrabbed();
+            if (gameObject.name == "Curves pipe")
+            {
+                SequenceHelperFunctions.instance.OnPipeGrabbed();
+            }
+            else
+            {
+                SequenceHelperFunctions.instance.OnObjectGrabbed();
+            }
         }
     }
 

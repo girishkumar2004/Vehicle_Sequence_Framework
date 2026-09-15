@@ -58,7 +58,9 @@ public class SequenceHandler : MonoBehaviour
             return;
         }
 
+        string completedTaskName = sequenceList[currentSequence].TaskList[currentTask].TaskName;
         sequenceList[currentSequence].TaskList[currentTask].TaskCompleted = true;
+        Debug.Log($"[SEQUENCE COMPLETE]\nTask = {completedTaskName}");
         Debug.Log("Current task num : " + currentTask + " completed by " + gameObject.name);
         currentTask++;
         NextTask();
@@ -270,11 +272,16 @@ public class SequenceHandler : MonoBehaviour
 
     public void NextSequence()
     {
+        string fromName = (sequenceList != null && currentSequence >= 0 && currentSequence < sequenceList.Count)
+            ? sequenceList[currentSequence].SequenceName : currentSequence.ToString();
         currentSequence++;
         if (currentSequence >= sequenceList.Count)
         {
+            Debug.Log($"[SEQUENCE ADVANCE]\nFrom = {fromName}\nTo = (none - all sequences completed)");
             return;
         }
+        string toName = sequenceList[currentSequence].SequenceName;
+        Debug.Log($"[SEQUENCE ADVANCE]\nFrom = {fromName}\nTo = {toName}");
         currentTask = 0;
         NextTask();
     }

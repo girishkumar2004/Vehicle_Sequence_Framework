@@ -47,6 +47,7 @@ public enum InflationState
     CORRECT_PRESSURE,
     WAITING_FOR_SELECT,
     SELECT_PRESSED,
+    CONFIRMED,
     WAITING_FOR_PIPE_GRAB,
     PIPE_GRABBED,
     COMPLETE
@@ -87,25 +88,21 @@ public class NumericVariableController : MonoBehaviour
     public AudioClip lowWarningSFX;
     public AudioClip targetConfirmedSFX;
 
-    [Header("UI WARNING CARDS & SELECT BUTTON & PIPE")]
+    [Header("UI WARNING CARDS & SELECT BUTTON")]
     public GameObject lowWarningCard;
     public GameObject highWarningCard;
     public GameObject successCard;
     public GameObject selectButtonObject;
-    public GameObject curvesPipeObject;
     public GameObject plusButtonObject;
     public GameObject minusButtonObject;
 
     [Header("MATERIALS & HIGHLIGHTS")]
     public Material defaultSelectMaterial;
     public Material highlightSelectMaterial;
-    public Material defaultPipeMaterial;
-    public Material highlightPipeMaterial;
     public Material defaultPlusMaterial;
     public Material defaultMinusMaterial;
 
     private MeshRenderer selectRenderer;
-    private MeshRenderer pipeRenderer;
     private MeshRenderer plusRenderer;
     private MeshRenderer minusRenderer;
 
@@ -187,7 +184,6 @@ public class NumericVariableController : MonoBehaviour
         DisablePlusHighlight();
         DisableMinusHighlight();
         DisableSelectInteraction();
-        DisablePipeInteraction();
         HideAllCards();
 
         foreach (var c in conditions) c.wasTrueLastFrame = false;
@@ -234,18 +230,6 @@ public class NumericVariableController : MonoBehaviour
             defaultMinusMaterial = defaultSelectMaterial;
         }
 
-        var pipe = curvesPipeObject != null ? curvesPipeObject : UnityEngine.GameObject.Find("Curves pipe");
-        if (pipe != null)
-        {
-            curvesPipeObject = pipe;
-            if (pipeRenderer == null) pipeRenderer = pipe.GetComponent<MeshRenderer>();
-            if (pipeRenderer != null && (defaultPipeMaterial == null || defaultPipeMaterial.name.Contains("Highlight")))
-            {
-                if (pipeRenderer.sharedMaterial != null && !pipeRenderer.sharedMaterial.name.Contains("Highlight"))
-                    defaultPipeMaterial = pipeRenderer.sharedMaterial;
-            }
-        }
-
         if (selectButtonObject != null && selectRenderer == null)
             selectRenderer = selectButtonObject.GetComponent<MeshRenderer>();
 
@@ -267,14 +251,12 @@ public class NumericVariableController : MonoBehaviour
 #if UNITY_EDITOR
         if (highlightSelectMaterial == null)
             highlightSelectMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/TruckTyreReplacement/Materials/M_Highlight_FluorescentGreen.mat");
-        if (highlightPipeMaterial == null)
-            highlightPipeMaterial = UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/TruckTyreReplacement/Materials/M_Highlight_FluorescentGreen.mat");
 #endif
     }
 
     public void Increment()
     {
-        if (!isInitialized || currentState == InflationState.SELECT_PRESSED || currentState == InflationState.WAITING_FOR_PIPE_GRAB || currentState == InflationState.COMPLETE) return;
+        if (!isInitialized || currentState == InflationState.SELECT_PRESSED || currentState == InflationState.CONFIRMED) return;
         PlaySFX(incrementSFX);
         float before = currentValue;
         SetValue(currentValue + incrementStep);
@@ -284,7 +266,7 @@ public class NumericVariableController : MonoBehaviour
 
     public void Decrement()
     {
-        if (!isInitialized || currentState == InflationState.SELECT_PRESSED || currentState == InflationState.WAITING_FOR_PIPE_GRAB || currentState == InflationState.COMPLETE) return;
+        if (!isInitialized || currentState == InflationState.SELECT_PRESSED || currentState == InflationState.CONFIRMED) return;
         PlaySFX(decrementSFX);
         float before = currentValue;
         SetValue(currentValue - decrementStep);
@@ -353,112 +335,9 @@ public class NumericVariableController : MonoBehaviour
 
         Debug.Log("[AUDIO FLOW] SELECT AUDIO COMPLETE");
         HideAllCards();
-        currentState = InflationState.WAITING_FOR_PIPE_GRAB;
+        currentState = InflationState.CONFIRMED;
 
         OnConfirmed?.Invoke();
-    }
-
-    public void OnPipeGrabbedSelectEntered(UnityEngine.XR.Interaction.Toolkit.SelectEnterEventArgs args) => OnPipeGrabbed();
-
-    public void OnPipeGrabbed()
-    {
-        if (currentState != InflationState.WAITING_FOR_PIPE_GRAB)
-        {
-            var sh = SequenceHandler.instance != null ? SequenceHandler.instance : UnityEngine.Object.FindFirstObjectByType<SequenceHandler>();
-            if (sh == null || (sh.currentTask != 2 && sh.currentTask != 3))
-            {
-                Debug.Log($"[Tyre] OnPipeGrabbed BLOCKED — state={currentState}");
-                return;
-            }
-        }
-
-        currentState = InflationState.PIPE_GRABBED;
-        Debug.Log("[Tyre] Curves pipe ACTUALLY GRABBED");
-
-        DisablePipeInteraction();
-
-        // Enable pipe 2 on successful grab
-        var allGOs = UnityEngine.Object.FindObjectsByType<UnityEngine.GameObject>(UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None);
-        foreach (var g in allGOs)
-        {
-            if (g.name == "pipe 2")
-            {
-                g.SetActive(true);
-                Debug.Log("[Tyre] Activated pipe 2 upon Curves pipe grab.");
-                break;
-            }
-        }
-
-        // Disable Curves pipe GameObject so it hides after being grabbed
-        var pipe = curvesPipeObject != null ? curvesPipeObject : UnityEngine.GameObject.Find("Curves pipe");
-        if (pipe != null)
-        {
-            pipe.SetActive(false);
-            Debug.Log("[Tyre] Disabled Curves pipe GameObject upon grab.");
-        }
-
-        StartCoroutine(AirFillingSoundAndCompleteRoutine());
-    }
-
-    private System.Collections.IEnumerator AirFillingSoundAndCompleteRoutine()
-    {
-        var mgr = GetManager();
-
-        // Stop any currently playing TTS speech (like pipe_grab instruction) immediately on grab
-        if (mgr != null)
-        {
-            mgr.StopSpeech();
-        }
-
-        AudioSource sfxSrc = mgr != null ? mgr.GetSFXAudioSource() : null;
-
-        Debug.Log("[AUDIO FLOW] Air Filling Sound START");
-        AudioClip airFillClip = Resources.Load<AudioClip>("Audio/Air Filling Sound");
-        if (airFillClip == null) airFillClip = Resources.Load<AudioClip>("Air Filling Sound");
-        if (airFillClip == null && targetConfirmedSFX != null) airFillClip = targetConfirmedSFX;
-
-        if (airFillClip != null && mgr != null)
-        {
-            mgr.PlaySFX(airFillClip);
-            if (sfxSrc != null)
-            {
-                float start = Time.realtimeSinceStartup;
-                yield return new WaitUntil(() => sfxSrc.isPlaying || (Time.realtimeSinceStartup - start) > 0.5f);
-                if (sfxSrc.isPlaying)
-                {
-                    yield return new WaitUntil(() => !sfxSrc.isPlaying);
-                }
-            }
-            else
-            {
-                yield return new WaitForSeconds(airFillClip.length);
-            }
-        }
-        else
-        {
-            yield return new WaitForSeconds(2.0f);
-        }
-        Debug.Log("[AUDIO FLOW] Air Filling Sound ENDS");
-        yield return new WaitForSeconds(0.3f);
-
-        currentState = InflationState.COMPLETE;
-
-        if (SequenceHelperFunctions.instance != null)
-            SequenceHelperFunctions.instance.OnObjectGrabbed();
-    }
-
-    public void ConnectCurvesPipeToWhlHdFr()
-    {
-        var pipe = curvesPipeObject != null ? curvesPipeObject : UnityEngine.GameObject.Find("Curves pipe");
-        var whl = UnityEngine.GameObject.Find("Whl HD FR");
-
-        if (pipe != null && whl != null)
-        {
-            Debug.Log("[Tyre] Connecting Curves pipe → Whl HD FR");
-            pipe.transform.SetParent(whl.transform, true);
-            pipe.transform.localPosition = new UnityEngine.Vector3(0f, 0.1f, 0.2f);
-            pipe.transform.localRotation = UnityEngine.Quaternion.identity;
-        }
     }
 
     private void PlaySFX(AudioClip clip)
@@ -474,7 +353,6 @@ public class NumericVariableController : MonoBehaviour
     {
         currentState = InflationState.PRESSURE_CHECK;
         DisableSelectInteraction();
-        DisablePipeInteraction();
         HideAllCards();
         SetValue(initialValue);
     }
@@ -483,7 +361,6 @@ public class NumericVariableController : MonoBehaviour
     {
         isInitialized = false;
         DisableSelectInteraction();
-        DisablePipeInteraction();
         HideAllCards();
         enabled = false;
     }
@@ -513,7 +390,7 @@ public class NumericVariableController : MonoBehaviour
 
     private void EvaluateState()
     {
-        if (currentState == InflationState.SELECT_PRESSED || currentState == InflationState.WAITING_FOR_PIPE_GRAB || currentState == InflationState.PIPE_GRABBED || currentState == InflationState.COMPLETE)
+        if (currentState == InflationState.SELECT_PRESSED || currentState == InflationState.CONFIRMED)
         {
             return;
         }
@@ -532,7 +409,6 @@ public class NumericVariableController : MonoBehaviour
                 EnablePlusHighlight();
                 DisableMinusHighlight();
                 DisableSelectInteraction();
-                DisablePipeInteraction();
 
                 ShowCard(lowWarningCard);
                 HideCard(highWarningCard);
@@ -552,7 +428,6 @@ public class NumericVariableController : MonoBehaviour
                 DisablePlusHighlight();
                 EnableMinusHighlight();
                 DisableSelectInteraction();
-                DisablePipeInteraction();
 
                 ShowCard(highWarningCard);
                 HideCard(lowWarningCard);
@@ -572,7 +447,6 @@ public class NumericVariableController : MonoBehaviour
                 Debug.Log("[Tyre] CORRECT PRESSURE — 110 PSI");
                 DisablePlusHighlight();
                 DisableMinusHighlight();
-                DisablePipeInteraction();
 
                 ShowCard(successCard);
                 HideCard(lowWarningCard);
@@ -754,134 +628,12 @@ public class NumericVariableController : MonoBehaviour
         }
     }
 
-    public void EnablePipeInteraction()
-    {
-        currentState = InflationState.WAITING_FOR_PIPE_GRAB;
-        var pipe = curvesPipeObject != null ? curvesPipeObject : UnityEngine.GameObject.Find("Curves pipe");
-        if (pipe == null)
-        {
-            var allGOs = UnityEngine.Object.FindObjectsByType<UnityEngine.GameObject>(UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None);
-            foreach (var g in allGOs) if (g.name == "Curves pipe") { pipe = g; break; }
-        }
-
-        if (pipe != null)
-        {
-            curvesPipeObject = pipe;
-            pipe.SetActive(true);
-
-            // Ensure player is positioned at AirfillPoint facing AIRBUM and Curves pipe
-            var airfillPoint = UnityEngine.GameObject.Find("AirfillPoint");
-            if (airfillPoint != null)
-            {
-                var mgr = GetManager();
-                if (mgr != null) mgr.MovePlayerTo(airfillPoint.transform);
-            }
-
-            var grab = pipe.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
-            if (grab == null) grab = pipe.AddComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
-
-            if (grab != null)
-            {
-                grab.enabled = true;
-                grab.interactionLayers = -1; // Allow all interaction layers
-                grab.movementType = UnityEngine.XR.Interaction.Toolkit.Interactables.XRBaseInteractable.MovementType.Instantaneous;
-                grab.trackPosition = true;
-                grab.trackRotation = true;
-                grab.throwOnDetach = false;
-
-                if (grab.interactionManager == null)
-                {
-                    grab.interactionManager = UnityEngine.Object.FindFirstObjectByType<UnityEngine.XR.Interaction.Toolkit.XRInteractionManager>();
-                }
-
-                var col = pipe.GetComponent<UnityEngine.Collider>();
-                if (col != null)
-                {
-                    col.enabled = true;
-                    if (!grab.colliders.Contains(col))
-                        grab.colliders.Add(col);
-                }
-
-                grab.selectEntered.RemoveListener(OnPipeGrabbedSelectEntered);
-                grab.selectEntered.AddListener(OnPipeGrabbedSelectEntered);
-
-#if UNITY_EDITOR
-                var so = new UnityEditor.SerializedObject(grab);
-                var farProp = so.FindProperty("m_FarAttachMode");
-                if (farProp != null)
-                {
-                    farProp.enumValueIndex = 2; // Far attach mode (allows raycast grab)
-                    so.ApplyModifiedProperties();
-                }
-#endif
-            }
-
-            var colBox = pipe.GetComponent<UnityEngine.BoxCollider>();
-            if (colBox != null)
-            {
-                colBox.enabled = true;
-                colBox.isTrigger = false;
-                colBox.size = new Vector3(0.005f, 0.015f, 0.01f);
-                colBox.center = Vector3.zero;
-            }
-
-            var rb = pipe.GetComponent<UnityEngine.Rigidbody>();
-            if (rb == null) rb = pipe.AddComponent<UnityEngine.Rigidbody>();
-            if (rb != null)
-            {
-                rb.isKinematic = true;
-                rb.useGravity = false;
-            }
-
-            var gd = pipe.GetComponent<GrabDetect>();
-            if (gd != null) gd.ActivateGrab();
-
-            if (pipeRenderer == null) pipeRenderer = pipe.GetComponent<MeshRenderer>();
-            if (pipeRenderer != null && highlightPipeMaterial != null)
-                pipeRenderer.sharedMaterial = highlightPipeMaterial;
-
-            if (SequenceHelperFunctions.instance != null)
-                SequenceHelperFunctions.instance.ApplySafeGhostHighlight(pipe);
-
-            Debug.Log("[Tyre] Curves Pipe Highlight ON (Player Moved to AirfillPoint & Far Raycast Enabled)");
-        }
-    }
-
-    public void DisablePipeInteraction()
-    {
-        var pipe = curvesPipeObject != null ? curvesPipeObject : UnityEngine.GameObject.Find("Curves pipe");
-        if (pipe == null)
-        {
-            var allGOs = UnityEngine.Object.FindObjectsByType<UnityEngine.GameObject>(UnityEngine.FindObjectsInactive.Include, UnityEngine.FindObjectsSortMode.None);
-            foreach (var g in allGOs) if (g.name == "Curves pipe") { pipe = g; break; }
-        }
-
-        if (pipe != null)
-        {
-            curvesPipeObject = pipe;
-            var grab = pipe.GetComponent<UnityEngine.XR.Interaction.Toolkit.Interactables.XRGrabInteractable>();
-            if (grab != null) grab.enabled = false;
-
-            var gd = pipe.GetComponent<GrabDetect>();
-            if (gd != null) gd.DeactivateGrab();
-
-            if (SequenceHelperFunctions.instance != null)
-                SequenceHelperFunctions.instance.RemoveSafeGhostHighlight(pipe);
-
-            if (pipeRenderer == null) pipeRenderer = pipe.GetComponent<MeshRenderer>();
-            if (pipeRenderer != null && defaultPipeMaterial != null)
-                pipeRenderer.sharedMaterial = defaultPipeMaterial;
-
-            Debug.Log("[Tyre] Curves Pipe Highlight OFF");
-        }
-    }
-
     public void ShowSelectButton() => EnableSelectInteraction();
     public void HideSelectButton() => DisableSelectInteraction();
 
     public void OnSelectPressed()
     {
-        if (currentState == InflationState.SELECT_PRESSED || currentState == InflationState.WAITING_FOR_PIPE_GRAB || currentState == InflationState.PIPE_GRABBED || currentState == InflationState.COMPLETE) return;
+        if (currentState == InflationState.SELECT_PRESSED || currentState == InflationState.CONFIRMED) return;
 
         Debug.Log("[Tyre] Select PRESSED");
         currentState = InflationState.SELECT_PRESSED;
